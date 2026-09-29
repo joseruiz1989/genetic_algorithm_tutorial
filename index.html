@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratorio de Algoritmos Genéticos - Exploración del Paisaje de Aptitud</title>
+    <meta name="description" content="Simulador interactivo para el estudio de paisajes de aptitud, la función F6 de Schaffer y los fundamentos de Algoritmos Genéticos para investigación doctoral.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧬</text></svg>">
+
+    <!-- Tipografía Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Three.js y OrbitControls para la visualización 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Estilos CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Header Principal -->
+    <header class="app-header">
+        <div class="brand-wrapper">
+            <div class="brand-logo-icon">🧬</div>
+            <div>
+                <h1 class="brand-title">Laboratorio Interactivo de Algoritmos Genéticos</h1>
+                <div class="brand-subtitle">Módulo 1: La Dificultad de la Búsqueda a Ciegas en Paisajes Deceptivos (F6 de Schaffer)</div>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            <span class="badge-tag" id="sessionBadge">ID: EXP-000000</span>
+            <button class="btn btn-secondary btn-sm" id="btnOpenTheoryModal">
+                📖 Guía Teórica y Doctorado
+            </button>
+        </div>
+    </header>
+
+    <!-- Layout Principal de 3 Columnas -->
+    <main class="main-layout">
+
+        <!-- Columna Izquierda: Configuración del Problema e Inyección de Soluciones -->
+        <aside class="sidebar-panel">
+            
+            <!-- Configuración del Problema -->
+            <div class="card-section">
+                <div class="card-title">⚙️ Configuración del Problema</div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="selectBenchmark">Función de Prueba:</label>
+                    <select class="form-select" id="selectBenchmark">
+                        <option value="schaffer_f6" selected>Función F6 de Schaffer (Recomendada)</option>
+                        <option value="rastrigin">Función de Rastrigin (Retícula multimodal)</option>
+                        <option value="ackley">Función de Ackley (Embudo central)</option>
+                        <option value="rosenbrock">Valle de Rosenbrock (Valle curvado)</option>
+                        <option value="himmelblau">Función de Himmelblau (4 óptimos)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Centro / Óptimo Global $(x_0, y_0)$:</label>
+                    <div class="radio-pill-group">
+                        <div>
+                            <input type="radio" name="centerMode" id="centerFixed" value="fixed" class="radio-pill-input" checked>
+                            <label for="centerFixed" class="radio-pill-label">Fijo en (0, 0)</label>
+                        </div>
+                        <div>
+                            <input type="radio" name="centerMode" id="centerRandom" value="random" class="radio-pill-input">
+                            <label for="centerRandom" class="radio-pill-label">Aleatorio Oculto</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Valor del Máximo Global ($f^*$):</label>
+                    <div class="radio-pill-group">
+                        <div>
+                            <input type="radio" name="maxMode" id="maxFixed" value="fixed" class="radio-pill-input" checked>
+                            <label for="maxFixed" class="radio-pill-label">Fijo = 1.0</label>
+                        </div>
+                        <div>
+                            <input type="radio" name="maxMode" id="maxRandom" value="random" class="radio-pill-input">
+                            <label for="maxRandom" class="radio-pill-label">Oculto (100 a 500)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="groupFrequency">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label class="form-label" for="sliderFrequency" style="margin-bottom: 0;">Frecuencia Ondas ($\omega$ en F6):</label>
+                        <span class="badge-tag" id="valFrequency" style="font-family: var(--font-mono); font-size: 0.72rem;">1.0x</span>
+                    </div>
+                    <input type="range" id="sliderFrequency" min="0.2" max="5.0" step="0.1" value="1.0" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                    <div class="freq-presets-row" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px;">
+                        <button type="button" class="btn btn-secondary btn-sm freq-btn" data-freq="0.5" style="padding: 3px 2px; font-size: 0.68rem;">0.5x</button>
+                        <button type="button" class="btn btn-secondary btn-sm freq-btn active" data-freq="1.0" style="padding: 3px 2px; font-size: 0.68rem;">1.0x</button>
+                        <button type="button" class="btn btn-secondary btn-sm freq-btn" data-freq="2.5" style="padding: 3px 2px; font-size: 0.68rem;">2.5x</button>
+                        <button type="button" class="btn btn-secondary btn-sm freq-btn" data-freq="5.0" style="padding: 3px 2px; font-size: 0.68rem;">5.0x</button>
+                    </div>
+                    <small style="display: block; font-size: 0.68rem; color: var(--text-dim); margin-top: 4px;">
+                        Mayor $\omega$ genera miles de crestas y reduce drásticamente el radio del pico.
+                    </small>
+                </div>
+
+                <button class="btn btn-secondary" id="btnResetProblem" style="width: 100%; margin-top: 6px;">
+                    🔄 Nuevo Experimento / Reiniciar
+                </button>
+            </div>
+
+            <!-- Sugerir Soluciones Manualmente -->
+            <div class="card-section">
+                <div class="card-title">🎯 Sugerir Solución Manual</div>
+                <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 8px;">
+                    Escribe las coordenadas o haz <strong>click directo</strong> en cualquier parte del mapa:
+                </p>
+
+                <div class="coord-input-row">
+                    <div class="coord-field">
+                        <label class="form-label" for="inputCoordX">X:</label>
+                        <input type="number" step="0.5" id="inputCoordX" class="form-input" placeholder="0.0">
+                    </div>
+                    <div class="coord-field">
+                        <label class="form-label" for="inputCoordY">Y:</label>
+                        <input type="number" step="0.5" id="inputCoordY" class="form-input" placeholder="0.0">
+                    </div>
+                    <button class="btn btn-primary" id="btnEvalManual">Evaluar</button>
+                </div>
+            </div>
+
+            <!-- Generación Aleatoria (Monte Carlo) -->
+            <div class="card-section">
+                <div class="card-title">🎲 Muestreo Aleatorio (Fuerza Bruta)</div>
+                <p style="font-size: 0.74rem; color: var(--text-muted);">
+                    Simula la búsqueda a ciegas sin heurística evolutiva:
+                </p>
+
+                <div class="random-btn-grid">
+                    <button class="btn btn-secondary btn-sm" id="btnRandom1">+1 Aleatorio</button>
+                    <button class="btn btn-secondary btn-sm" id="btnRandom5">+5 Aleatorios</button>
+                    <button class="btn btn-secondary btn-sm" id="btnRandom25">+25 Aleatorios</button>
+                    <button class="btn btn-secondary btn-sm" id="btnRandom100">+100 Aleatorios</button>
+                </div>
+            </div>
+
+            <!-- Demostración del Algoritmo Genético -->
+            <div class="card-section" style="border-color: rgba(255, 0, 119, 0.3);">
+                <div class="card-title" style="color: #ff3399;">🧬 Búsqueda Inteligente (AG)</div>
+                <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 10px;">
+                    Observa cómo la selección, cruzamiento y mutación concentran el esfuerzo en cuencas de alta aptitud:
+                </p>
+
+                <button class="btn btn-ga-evolve" id="btnEvolveGA" style="width: 100%;">
+                    ⚡ Evolucionar con AG (10 gen)
+                </button>
+            </div>
+
+        </aside>
+
+        <!-- Columna Central: Lienzo 2D y 3D -->
+        <section class="center-viewport">
+            
+            <!-- Barra superior del viewport -->
+            <div class="viewport-toolbar">
+                <div class="view-tabs">
+                    <button class="view-tab-btn active" id="tabView2D">Vista 2D (Niebla)</button>
+                    <button class="view-tab-btn" id="tabView3D">Vista 3D Interactiva</button>
+                </div>
+
+                <div class="toolbar-toggles">
+                    <!-- Controles de Zoom -->
+                    <div class="zoom-controls-group" style="display: flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.25); padding: 2px 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                        <button class="btn btn-secondary btn-sm" id="btnZoomIn" title="Acercar (o usa la rueda del ratón hacia arriba)" style="padding: 3px 8px; font-weight: bold;">🔍+</button>
+                        <button class="btn btn-secondary btn-sm" id="btnZoomOut" title="Alejar (o usa la rueda del ratón hacia abajo)" style="padding: 3px 8px; font-weight: bold;">🔍−</button>
+                        <button class="btn btn-secondary btn-sm" id="btnZoomReset" title="Restablecer escala al 100%" style="padding: 3px 8px;">⟲ 1:1</button>
+                        <span class="badge-tag" id="badgeZoomLevel" style="font-family: var(--font-mono); font-size: 0.72rem; min-width: 48px; text-align: center;">1.0x</span>
+                    </div>
+
+                    <label class="toggle-item" title="Reconstruye progresivamente el mapa a medida que descubres puntos">
+                        <input type="checkbox" id="toggleInterpolation" class="switch-input" checked>
+                        <span>Reconstruir Terreno (IDW)</span>
+                    </label>
+
+                    <label class="toggle-item" title="Revela el paisaje de aptitud real completo para contrastar con tu búsqueda">
+                        <input type="checkbox" id="toggleGodMode" class="switch-input">
+                        <span>Revelar Terreno Real (Profesor)</span>
+                    </label>
+
+                    <button class="btn btn-secondary btn-sm" id="btnClearPoints">
+                        🗑️ Limpiar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenedor del Canvas -->
+            <div class="canvas-card" id="canvasCard">
+                <canvas id="canvas2D"></canvas>
+                <div id="container3D"></div>
+
+                <!-- HUD flotante -->
+                <div class="canvas-hud-overlay">
+                    <span id="hudCoords">Click para evaluar | Arrastra para mover (Pan) | Rueda para Zoom</span> | 
+                    <span class="hud-indicator" id="hudDomain">Dominio: [-100, 100]</span> |
+                    <span class="hud-indicator" id="hudZoom">Zoom: 1.0x</span>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Columna Derecha: Métricas, Progreso y Datos -->
+        <aside class="sidebar-panel">
+
+            <!-- Card de Proximidad al Óptimo -->
+            <div class="metric-highlight-card">
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em;">
+                    Aproximación al Óptimo Global
+                </div>
+
+                <div class="radial-progress-wrapper">
+                    <svg class="progress-circle-svg" viewBox="0 0 100 100">
+                        <circle class="progress-bg" cx="50" cy="50" r="45"></circle>
+                        <circle class="progress-bar-fill" id="radialProgressBar" cx="50" cy="50" r="45"></circle>
+                    </svg>
+                    <div class="progress-center-text">
+                        <div class="progress-percent-val" id="metricPercent">0.0%</div>
+                        <div class="progress-label">Aptitud</div>
+                    </div>
+                </div>
+
+                <div class="status-badge" id="metricStatusBadge">
+                    Esperando primera solución...
+                </div>
+            </div>
+
+            <!-- Estadísticas en Tiempo Real -->
+            <div class="card-section">
+                <div class="card-title">📊 Estadísticas de Búsqueda</div>
+                
+                <div class="stat-row">
+                    <span class="stat-label">Evaluaciones de Función:</span>
+                    <span class="stat-value" id="statEvaluations">0</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">Mejor Aptitud Encontrada:</span>
+                    <span class="stat-value" id="statBestFitness" style="color: var(--accent-gold);">-</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">Coordenadas del Mejor:</span>
+                    <span class="stat-value" id="statBestCoords">-</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">Distancia Euclidiana:</span>
+                    <span class="stat-value" id="statBestDistance" style="color: var(--primary-cyan);">-</span>
+                </div>
+
+                <div class="stat-row" id="rowTrueOptimum" style="display: none; background: rgba(255, 0, 85, 0.1); padding: 4px;">
+                    <span class="stat-label" style="color: #ff5588;">Óptimo Oculto ($f^*$):</span>
+                    <span class="stat-value" id="statTrueFitness" style="color: #ff5588;">-</span>
+                </div>
+            </div>
+
+            <!-- Gráfico de Convergencia -->
+            <div class="card-section">
+                <div class="card-title">📈 Curva de Convergencia</div>
+                <div class="chart-container">
+                    <canvas id="convergenceChart"></canvas>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-dim); margin-top: 4px; font-family: var(--font-mono);">
+                    <span>Eval #1</span>
+                    <span>Progreso de Aptitud</span>
+                    <span id="chartMaxEval">#0</span>
+                </div>
+            </div>
+
+            <!-- Tabla de Últimas Soluciones y Exportación -->
+            <div class="card-section" style="flex: 1; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div class="card-title" style="margin-bottom: 0;">📜 Historial</div>
+                    <button class="btn btn-secondary btn-sm" id="btnExportCSV" title="Descargar como CSV para analizar en Python">
+                        📥 CSV
+                    </button>
+                </div>
+
+                <div class="table-scroll" style="flex: 1;">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>X</th>
+                                <th>Y</th>
+                                <th>Aptitud</th>
+                                <th>% Ópt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-dim); padding: 12px;">Sin datos aún</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </aside>
+
+    </main>
+
+    <!-- Modal Teórico y Pedagógico para el Doctorado -->
+    <div class="modal-overlay" id="theoryModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="font-size: 1.25rem; color: #ffffff;">Guía Pedagógica: Exploración de Paisajes de Aptitud</h2>
+                <button class="modal-close-btn" id="btnCloseTheoryModal">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <h3>1. ¿Por qué empezar con este experimento?</h3>
+                <p>
+                    Cuando enseñamos <strong>Algoritmos Genéticos (AG)</strong> a estudiantes con formación matemática o computacional pero sin experiencia en heurísticas de IA, el error más común es pensar: <em>"¿Por qué no simplemente evaluar muchos puntos al azar o usar descenso por gradiente?"</em>.
+                </p>
+                <p>
+                    Este simulador fue diseñado para que el estudiante experimente en primera persona la <strong>maldición de la dimensionalidad</strong> y la <strong>deceptividad</strong> de los paisajes multimodales complejos. En problemas reales de optimización (caja negra), el evaluador no conoce la ecuación ni la topología del terreno: solo puede proponer un vector solución $\mathbf{x}$ y recibir un número (fitness).
+                </p>
+
+                <h3>2. La Función F6 de Schaffer</h3>
+                <p>
+                    Propuesta por J. David Schaffer en 1989, es uno de los problemas estándar más representativos en la literatura de computación evolutiva:
+                </p>
+                <div class="formula-box">
+                    f(x, y) = 0.5 - \frac{\sin^2\left(\sqrt{(x-x_0)^2 + (y-y_0)^2}\right) - 0.5}{\left[1 + 0.001\cdot\left((x-x_0)^2 + (y-y_0)^2\right)\right]^2}
+                </div>
+                <p>
+                    <strong>Características fundamentales:</strong>
+                </p>
+                <ul style="margin-left: 20px; margin-bottom: 12px;">
+                    <li><strong>Infinitos óptimos locales concéntricos:</strong> El término sinusoidal $\sin^2(r)$ crea crestas y valles circulares continuos que atrapan cualquier método de gradiente o búsqueda local.</li>
+                    <li><strong>Pico óptimo microscópico:</strong> El pico máximo global ($f^* = 1.0$) ocurre exactamente en el centro $(x_0, y_0)$, con un radio menor a $1.57$ unidades. En un espacio de búsqueda de $[-100, 100] \times [-100, 100]$ (área de $40,000$ unidades cuadradas), el área del pico representa menos del <strong>0.019%</strong> del espacio total.</li>
+                    <li><strong>Comportamiento asintótico deceptivo:</strong> A medida que nos alejamos del centro, el denominador amortigua las oscilaciones y la función converge asintóticamente a $0.5$. La búsqueda a ciegas percibe un terreno casi indistinguible y no tiene pistas de hacia dónde se ubica el centro.</li>
+                </ul>
+
+                <h3>3. Dinámica del Ejercicio para el Estudiante</h3>
+                <ol style="margin-left: 20px; margin-bottom: 12px;">
+                    <li><strong>Muestreo manual a ciegas:</strong> Con el centro aleatorio oculto, intenta hacer 10 clicks en el lienzo para encontrar el óptimo. Nota lo difícil que es obtener más de un 60% de aptitud.</li>
+                    <li><strong>Muestreo aleatorio (Monte Carlo):</strong> Inyecta 100 o 200 puntos aleatorios. Observa que a pesar de consumir cientos de evaluaciones computacionales costosas, rara vez se supera el 75-80% de aptitud.</li>
+                    <li><strong>El poder del Algoritmo Genético:</strong> Presiona el botón de evolución por AG. Observa cómo, mediante selección y cruzamiento, la población explota la información acumulada y converge hacia el 99%+ con una fracción del costo.</li>
+                </ol>
+
+                <div style="text-align: right; margin-top: 20px;">
+                    <button class="btn btn-primary" id="btnModalUnderstood">¡Entendido, volver a la simulación!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts de la Aplicación -->
+    <script src="js/benchmarks.js"></script>
+    <script src="js/ga_engine.js"></script>
+    <script src="js/landscape_renderer.js"></script>
+    <script src="js/surface_3d.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
