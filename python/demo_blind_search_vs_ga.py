@@ -1,8 +1,10 @@
 """
-demo_blind_search_vs_ga.py - Comparación empírica: Búsqueda Aleatoria vs Algoritmo Genético
-Demuestra por qué el muestreo a ciegas fracasa en la función F6 de Schaffer.
+demo_blind_search_vs_ga.py - Empirical Comparison: Blind Search vs. Genetic Algorithm
+Demonstrates why blind sampling fails on Schaffer's F6 function,
+and how expanding the search domain renders blind search completely ineffective.
 """
 
+import argparse
 import random
 import numpy as np
 import matplotlib
@@ -12,12 +14,12 @@ from benchmarks import OptimizationProblem
 
 
 def run_random_search(problem: OptimizationProblem, budget: int = 300):
-    """Búsqueda Aleatoria Uniforme (Monte Carlo puro)."""
+    """Uniform Random Search (Pure Monte Carlo)."""
     best_fitness = -float("inf")
     best_individual = None
     convergence = []
 
-    for i in range(budget):
+    for _ in range(budget):
         rx, ry = problem.generate_random_individual()
         eval_res = problem.evaluate(rx, ry)
 
@@ -31,7 +33,7 @@ def run_random_search(problem: OptimizationProblem, budget: int = 300):
 
 
 def run_grid_search(problem: OptimizationProblem, budget: int = 300):
-    """Búsqueda Sistemática por Malla (Grid Search)."""
+    """Systematic Grid Search."""
     side = int(np.sqrt(budget))
     xs = np.linspace(problem.min_x, problem.max_x, side)
     ys = np.linspace(problem.min_y, problem.max_y, side)
@@ -64,21 +66,22 @@ def run_genetic_algorithm(
     problem: OptimizationProblem,
     pop_size: int = 25,
     generations: int = 12,
+    elitism: int = 2,
     crossover_rate: float = 0.85,
     mutation_rate: float = 0.25
 ):
     """
-    Algoritmo Genético Real:
-    - Selección por Torneo (k=3)
-    - Cruzamiento Aritmético
-    - Mutación Gaussiana
-    - Elitismo (top 2)
+    Real-Coded Genetic Algorithm:
+    - Tournament Selection (k=3)
+    - Arithmetic Crossover
+    - Gaussian Mutation (scaled to search domain span)
+    - Elitism (preserves top E individuals)
     """
     population = []
     convergence = []
     best_overall = None
 
-    # Inicialización
+    # Population Initialization
     for _ in range(pop_size):
         rx, ry = problem.generate_random_individual()
         res = problem.evaluate(rx, ry)
@@ -87,27 +90,28 @@ def run_genetic_algorithm(
             best_overall = res
         convergence.append(best_overall["fitness"])
 
-    # Ciclo Evolutivo
+    # Evolutionary Cycle
     for _ in range(1, generations):
         population.sort(key=lambda ind: ind["fitness"], reverse=True)
         new_pop = []
 
-        # 1. Elitismo
-        new_pop.append(population[0])
-        new_pop.append(population[1])
+        # 1. Elitism: preserve top E solutions without modification
+        elite_count = min(elitism, len(population))
+        for e_idx in range(elite_count):
+            new_pop.append(population[e_idx])
 
-        # 2. Torneo
+        # 2. Tournament Selection
         def tournament():
             k = 3
             candidates = random.sample(population, k)
             return max(candidates, key=lambda c: c["fitness"])
 
-        # 3. Reproducción
+        # 3. Reproduction Loop
         while len(new_pop) < pop_size:
             p1 = tournament()
             p2 = tournament()
 
-            # Cruce
+            # Arithmetic Crossover
             if random.random() < crossover_rate:
                 alpha = 0.5
                 c1x = alpha * p1["x"] + (1 - alpha) * p2["x"]
@@ -118,7 +122,7 @@ def run_genetic_algorithm(
                 c1x, c1y = p1["x"], p1["y"]
                 c2x, c2y = p2["x"], p2["y"]
 
-            # Mutación
+            # Adaptive Gaussian Mutation
             span_x = problem.max_x - problem.min_x
             span_y = problem.max_y - problem.min_y
             sigma_x = span_x * 0.05
@@ -153,66 +157,93 @@ def run_genetic_algorithm(
 
 
 def main():
-    print("=" * 70)
-    print("EXPERIMENTO PEDAGÓGICO: MUESTREO A CIEGAS VS. ALGORITMO GENÉTICO")
-    print("Problema: Función F6 de Schaffer (Centro aleatorio oculto, Máx = 100)")
-    print("=" * 70)
+    parser = argparse.ArgumentParser(description="Empirical comparison between blind search and Genetic Algorithm.")
+    parser.add_argument("--domain-scale", type=float, default=1.0, help="Search domain scale factor (e.g., 1.0, 2.0, 5.0, 10.0)")
+    parser.add_argument("--budget", type=int, default=300, help="Total function evaluation budget")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
+    parser.add_argument("--benchmark", type=str, default="schaffer_f6", help="Benchmark identifier")
+    parser.add_argument("--freq", type=float, default=1.0, help="Wave frequency (F6)")
+    parser.add_argument("--pop-size", type=int, default=25, help="Population size for GA")
+    parser.add_argument("--generations", type=int, default=12, help="Number of generations for GA")
+    parser.add_argument("--elitism", type=int, default=2, help="Number of elite solutions preserved unmodified (0 to disable)")
+    args = parser.parse_args()
 
-    budget = 300
-    seed = 42
+    budget = args.budget
+    seed = args.seed
+    domain_scale = args.domain_scale
+    pop_size = args.pop_size
+    generations = args.generations
+    elitism = args.elitism
 
-    # Instanciar problema con centro aleatorio y máximo = 100.0
+    # Instantiate problem with scaled domain and hidden center
     problem = OptimizationProblem(
-        benchmark_name="schaffer_f6",
+        benchmark_name=args.benchmark,
         center_mode="random",
         max_mode="fixed",
         fixed_max=100.0,
+        frequency=args.freq,
+        domain_scale=domain_scale,
         random_seed=seed
     )
 
-    print(f"\n[CONFIGURACIÓN OCULTA DEL PROFESOR]")
-    print(f"- Centro real (x0, y0): ({problem.x0:.2f}, {problem.y0:.2f})")
-    print(f"- Máximo teórico global: {problem.global_max:.2f}")
-    print(f"- Dominio de búsqueda: [{problem.min_x}, {problem.max_x}] x [{problem.min_y}, {problem.max_y}]")
-    print(f"- Presupuesto computacional: {budget} evaluaciones de función\n")
+    area = (problem.max_x - problem.min_x) * (problem.max_y - problem.min_y)
 
-    # 1. Búsqueda Aleatoria
+    print("=" * 72)
+    print("PEDAGOGICAL EXPERIMENT: BLIND SEARCH VS. GENETIC ALGORITHM")
+    print(f"Problem: {problem.benchmark_cls.name} (Hidden Random Center, Max = 100.0)")
+    print("=" * 72)
+
+    print(f"\n[TEACHER'S HIDDEN CONFIGURATION]")
+    print(f"- Ground truth center (x0, y0): ({problem.x0:.2f}, {problem.y0:.2f})")
+    print(f"- Theoretical global maximum: {problem.global_max:.2f}")
+    print(f"- Search domain bounds: [{problem.min_x:.1f}, {problem.max_x:.1f}] x [{problem.min_y:.1f}, {problem.max_y:.1f}]")
+    print(f"- Domain scale: {domain_scale:.1f}x (Total search area: {area:,.0f} sq units)")
+    print(f"- Computational budget: {budget} function evaluations")
+    print(f"- GA parameters: Population = {pop_size}, Generations = {generations}, Elitism = {elitism}\n")
+
+    # 1. Random Search (Monte Carlo)
     random.seed(seed)
     best_rnd, conv_rnd = run_random_search(problem, budget=budget)
 
     # 2. Grid Search
     best_grid, conv_grid = run_grid_search(problem, budget=budget)
 
-    # 3. Algoritmo Genético
+    # 3. Genetic Algorithm
     random.seed(seed)
-    best_ga, conv_ga = run_genetic_algorithm(problem, pop_size=25, generations=12)
+    best_ga, conv_ga = run_genetic_algorithm(
+        problem,
+        pop_size=pop_size,
+        generations=generations,
+        elitism=elitism
+    )
 
-    # Mostrar tabla de resultados
-    print("-" * 70)
-    print(f"{'Método':<22} | {'Mejor Aptitud':<15} | {'% del Óptimo':<14} | {'Distancia al Óptimo':<15}")
-    print("-" * 70)
-    print(f"{'Búsqueda Aleatoria':<22} | {best_rnd['fitness']:<15.4f} | {best_rnd['percent_of_global']:<14.2f}% | {best_rnd['distance_to_optimum']:<15.2f}")
-    print(f"{'Búsqueda por Malla':<22} | {best_grid['fitness']:<15.4f} | {best_grid['percent_of_global']:<14.2f}% | {best_grid['distance_to_optimum']:<15.2f}")
-    print(f"{'Algoritmo Genético':<22} | {best_ga['fitness']:<15.4f} | {best_ga['percent_of_global']:<14.2f}% | {best_ga['distance_to_optimum']:<15.2f}")
-    print("-" * 70)
+    # Display results table
+    print("-" * 72)
+    print(f"{'Method':<24} | {'Best Fitness':<14} | {'% of Optimum':<13} | {'Distance to Opt':<15}")
+    print("-" * 72)
+    print(f"{'Random Search (Monte Carlo)':<24} | {best_rnd['fitness']:<14.4f} | {best_rnd['percent_of_global']:<13.2f}% | {best_rnd['distance_to_optimum']:<15.2f}")
+    print(f"{'Grid Search':<24} | {best_grid['fitness']:<14.4f} | {best_grid['percent_of_global']:<13.2f}% | {best_grid['distance_to_optimum']:<15.2f}")
+    print(f"{'Genetic Algorithm (GA)':<24} | {best_ga['fitness']:<14.4f} | {best_ga['percent_of_global']:<13.2f}% | {best_ga['distance_to_optimum']:<15.2f}")
+    print("-" * 72)
 
-    # Generar gráfico de convergencia
+    # Generate convergence plot
     plt.figure(figsize=(10, 5), dpi=150)
-    plt.plot(conv_rnd, label="Búsqueda Aleatoria (Monte Carlo)", color="#3498db", linestyle="--", linewidth=1.8)
-    plt.plot(conv_grid, label="Búsqueda por Malla (Grid Search)", color="#95a5a6", linestyle=":", linewidth=1.8)
-    plt.plot(conv_ga, label="Algoritmo Genético (AG)", color="#e74c3c", linewidth=2.4)
-    plt.axhline(problem.global_max, color="#2ecc71", linestyle="-.", label="Óptimo Teórico Global (100%)", linewidth=1.5)
+    plt.plot(conv_rnd, label="Random Search (Monte Carlo)", color="#3498db", linestyle="--", linewidth=1.8)
+    plt.plot(conv_grid, label="Grid Search", color="#95a5a6", linestyle=":", linewidth=1.8)
+    plt.plot(conv_ga, label="Genetic Algorithm (GA)", color="#e74c3c", linewidth=2.4)
+    plt.axhline(problem.global_max, color="#2ecc71", linestyle="-.", label="Theoretical Global Optimum (100%)", linewidth=1.5)
 
-    plt.title("Comparativa de Convergencia: F6 de Schaffer (300 Evaluaciones)", fontsize=13, fontweight="bold")
-    plt.xlabel("Evaluación de la Función de Aptitud (# llamadas)", fontsize=11)
-    plt.ylabel("Mejor Aptitud Acumulada", fontsize=11)
+    title_suffix = f" (Scale: {domain_scale:.1f}x, Budget: {budget} Evals)"
+    plt.title(f"Convergence Comparison: {problem.benchmark_cls.name}{title_suffix}", fontsize=13, fontweight="bold")
+    plt.xlabel("Function Evaluations (# calls)", fontsize=11)
+    plt.ylabel("Accumulated Best Fitness", fontsize=11)
     plt.grid(True, alpha=0.3)
     plt.legend(loc="lower right", fontsize=10)
     plt.tight_layout()
 
     out_plot = "comparativa_convergencia.png"
     plt.savefig(out_plot)
-    print(f"\n[OK] Gráfico de convergencia guardado exitosamente en: {out_plot}")
+    print(f"\n[OK] Convergence graph successfully saved to: {out_plot}")
 
 
 if __name__ == "__main__":

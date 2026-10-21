@@ -1,6 +1,6 @@
 """
-Repositorio Tutorial de Algoritmos Genéticos (Nivel Doctorado / Posgrado)
-Módulo 1: Paisajes de Aptitud y la Dificultad del Muestreo a Ciegas
+Genetic Algorithms Tutorial Repository (Graduate / Doctoral Level)
+Module 1: Fitness Landscapes and the Curse of Blind Search
 """
 
 from .benchmarks import SchafferF6, Rastrigin, Ackley, Rosenbrock, Himmelblau, OptimizationProblem

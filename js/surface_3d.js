@@ -1,7 +1,7 @@
 /**
- * surface_3d.js - Visualizador 3D interactivo para paisajes de aptitud
- * Permite rotar en 360 grados, hacer zoom y observar en 3 dimensiones
- * los picos, valles y cómo se distribuyen las soluciones evaluadas.
+ * surface_3d.js - Interactive 3D WebGL Surface Viewer for Fitness Landscapes
+ * Enables 360-degree rotation, zooming, and 3D visual inspection of
+ * peaks, valleys, ridges, and spatial distribution of candidate solutions.
  */
 
 class Surface3DViewer {
@@ -18,11 +18,11 @@ class Surface3DViewer {
         this.surfaceMesh = null;
         this.pointsGroup = null;
 
-        // Verificar disponibilidad de THREE
+        // Verify Three.js availability
         if (typeof THREE !== "undefined") {
             this.initThree();
         } else {
-            console.warn("Three.js no detectado, esperando carga de script...");
+            console.warn("Three.js not detected, waiting for script load...");
             window.addEventListener("load", () => {
                 if (typeof THREE !== "undefined") this.initThree();
             });
@@ -35,30 +35,30 @@ class Surface3DViewer {
         const width = this.container.clientWidth || 600;
         const height = this.container.clientHeight || 450;
 
-        // Escena
+        // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x0a0f1d);
 
-        // Cámara
+        // Camera
         this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
         this.camera.position.set(70, 70, 90);
 
-        // Renderizador
+        // WebGL Renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(width, height);
         this.renderer.setPixelRatio(window.devicePixelRatio || 1);
         this.container.innerHTML = "";
         this.container.appendChild(this.renderer.domElement);
 
-        // Controles de órbita
+        // OrbitControls
         if (typeof THREE.OrbitControls !== "undefined") {
             this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
             this.controls.enableDamping = true;
             this.controls.dampingFactor = 0.08;
-            this.controls.maxPolarAngle = Math.PI / 2 + 0.1; // No bajar demasiado bajo la base
+            this.controls.maxPolarAngle = Math.PI / 2 + 0.1; // Restrict dipping excessively below plane
         }
 
-        // Iluminación
+        // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
         this.scene.add(ambientLight);
 
@@ -70,24 +70,24 @@ class Surface3DViewer {
         dirLight2.position.set(-50, 50, -50);
         this.scene.add(dirLight2);
 
-        // Grupo para soluciones evaluadas
+        // Group for evaluated solutions
         this.pointsGroup = new THREE.Group();
         this.scene.add(this.pointsGroup);
 
-        // Construir superficie
+        // Build 3D landscape mesh
         this.buildSurface();
 
-        // Grid auxiliar en la base
-        const gridHelper = new THREE.GridHelper(100, 20, 0x00d2ff, 0x1f2e4d);
+        // Base coordinate grid (enhanced visibility)
+        const gridHelper = new THREE.GridHelper(100, 20, 0x00e5ff, 0x5a7ca8);
         gridHelper.position.y = -0.5;
         this.scene.add(gridHelper);
 
         this.isInitialized = true;
 
-        // Resize
+        // Window resize listener
         window.addEventListener("resize", () => this.onResize());
 
-        // Bucle de animación
+        // Animation loop
         this.animate = this.animate.bind(this);
         requestAnimationFrame(this.animate);
     }
@@ -111,7 +111,7 @@ class Surface3DViewer {
     }
 
     /**
-     * Construye la malla 3D evaluando z = f(x, y)
+     * Constructs 3D surface mesh evaluating z = f(x, y)
      */
     buildSurface() {
         if (!this.scene) return;
@@ -121,22 +121,22 @@ class Surface3DViewer {
             this.surfaceMesh.material.dispose();
         }
 
-        const segments = 60; // 60x60 vértices
+        const segments = 60; // 60x60 grid resolution
         const geom = new THREE.PlaneGeometry(80, 80, segments, segments);
-        geom.rotateX(-Math.PI / 2); // Orientar en plano XZ horizontal
+        geom.rotateX(-Math.PI / 2); // Rotate to horizontal XZ plane
 
         const pos = geom.attributes.position;
         const count = pos.count;
         const colors = new Float32Array(count * 3);
 
         const d = this.problem.domain;
-        const heightScale = 25.0; // Altura máxima en unidades 3D
+        const heightScale = 25.0; // Maximum elevation in 3D units
 
         for (let i = 0; i < count; i++) {
             const x3d = pos.getX(i);
             const z3d = pos.getZ(i);
 
-            // Mapear de [-40, 40] a [d.minX, d.maxX]
+            // Map [-40, 40] 3D coordinates to [d.minX, d.maxX]
             const mathX = d.minX + ((x3d + 40) / 80) * (d.maxX - d.minX);
             const mathY = d.minY + ((z3d + 40) / 80) * (d.maxY - d.minY);
 
@@ -146,7 +146,7 @@ class Surface3DViewer {
 
             pos.setY(i, y3d);
 
-            // Color del vértice según aptitud
+            // Vertex color corresponding to fitness ratio
             const rgb = this.getRGBForRatio(ratio);
             colors[i * 3] = rgb.r;
             colors[i * 3 + 1] = rgb.g;
@@ -198,7 +198,7 @@ class Surface3DViewer {
         const ratio = point.percentOfGlobal / 100;
         const p3d = this.mathTo3D(point.x, point.y, ratio);
 
-        // Crear esfera para el punto
+        // Create sphere marker for solution point
         const sphereGeom = new THREE.SphereGeometry(1.2, 16, 16);
         const sphereMat = new THREE.MeshStandardMaterial({
             color: ratio > 0.85 ? 0xffd700 : 0x00f0ff,
@@ -209,7 +209,7 @@ class Surface3DViewer {
         const sphere = new THREE.Mesh(sphereGeom, sphereMat);
         sphere.position.set(p3d.x, p3d.y + 0.6, p3d.z);
 
-        // Vástago vertical desde la base hacia el punto
+        // Vertical drop line from base plane to marker
         const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 });
         const lineGeom = new THREE.BufferGeometry().setFromPoints([
             new THREE.Vector3(p3d.x, 0, p3d.z),

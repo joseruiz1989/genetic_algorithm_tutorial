@@ -1,12 +1,12 @@
 /**
- * landscape_renderer.js - Motor de renderizado en Canvas 2D interactivo con Zoom y Pan
- * Incluye:
- * - Zoom dinámico con rueda del ratón y botones (+ / - / Reset)
- * - Panorámica (arrastrar mapa con click y arrastre)
- * - Modo Niebla de Guerra (Fog of War) con reconstrucción progresiva (IDW)
- * - Modo Dios (Revelar terreno real con mapa de calor de alta resolución)
- * - Retícula matemática adaptativa con graduación dinámica
- * - Ondas de impacto animadas y marcadores de mejor solución
+ * landscape_renderer.js - Interactive 2D Canvas rendering engine with Zoom and Pan
+ * Features:
+ * - Dynamic zoom via mouse wheel and buttons (+ / - / Reset)
+ * - Panning (click & drag anywhere on the map)
+ * - Fog of War mode with progressive spatial interpolation (IDW)
+ * - God Mode / Teacher Mode (high-resolution ground truth fitness heatmap)
+ * - Adaptive mathematical coordinate grid with dynamic graduation
+ * - Animated impact ripples and global best solution callouts
  */
 
 class LandscapeRenderer {
@@ -15,14 +15,14 @@ class LandscapeRenderer {
         this.ctx = canvas.getContext("2d");
         this.problem = problem;
 
-        // Opciones de visualización
+        // Visualization options
         this.showGodMode = options.showGodMode || false;
         this.showFogOfWar = options.showFogOfWar !== undefined ? options.showFogOfWar : true;
         this.showInterpolation = options.showInterpolation !== undefined ? options.showInterpolation : true;
         this.radarRadius = options.radarRadius || 18;
         this.pointSize = options.pointSize || 6;
 
-        // Vista actual (soporte de Zoom y Pan)
+        // Current viewport bounds (supports Zoom and Pan)
         const d = this.problem.domain;
         this.view = {
             minX: d.minX,
@@ -31,33 +31,37 @@ class LandscapeRenderer {
             maxY: d.maxY
         };
 
-        // Estado del mouse / arrastre (Pan)
+        // Mouse drag / pan state
         this.isMouseDown = false;
         this.isDragging = false;
         this.mouseDownPos = { px: 0, py: 0 };
         this.viewAtMouseDown = null;
 
-        // Historial de evaluaciones
+        // Evaluation history
         this.evaluations = [];
         this.bestEvaluation = null;
 
-        // Animaciones (ondas al hacer click)
+        // Click ripple animations
         this.ripples = [];
 
-        // Estado del cursor
+        // Cursor coordinates
         this.hoverCoords = null; // {x, y}
 
-        // Cache de imagen del terreno real
+        // Cached ground truth offscreen buffer
         this.groundTruthCanvas = null;
 
-        // Configuración de visualización DPI
+        // Cached IDW progressive reconstruction buffer
+        this.idwCanvas = null;
+        this.idwDirty = true;
+
+        // High-DPI screen calibration
         this.dpr = window.devicePixelRatio || 1;
         this.setupDPI();
 
-        // Eventos
+        // Event listeners
         this.bindEvents();
 
-        // Loop de animación
+        // Animation loop
         this.isAnimating = true;
         this.animate = this.animate.bind(this);
         requestAnimationFrame(this.animate);
@@ -90,11 +94,14 @@ class LandscapeRenderer {
         this.bestEvaluation = null;
         this.ripples = [];
         this.groundTruthCanvas = null;
+        this.idwCanvas = null;
+        this.idwDirty = true;
         this.notifyViewChange();
     }
 
     addEvaluation(point) {
         this.evaluations.push(point);
+        this.idwDirty = true;
         if (!this.bestEvaluation || point.fitness > this.bestEvaluation.fitness) {
             this.bestEvaluation = point;
         }
@@ -116,6 +123,7 @@ class LandscapeRenderer {
                 this.bestEvaluation = pt;
             }
         }
+        this.idwDirty = true;
         if (points.length > 0) {
             const last = points[points.length - 1];
             this.ripples.push({
@@ -133,10 +141,12 @@ class LandscapeRenderer {
         this.evaluations = [];
         this.bestEvaluation = null;
         this.ripples = [];
+        this.idwCanvas = null;
+        this.idwDirty = true;
     }
 
     // ==========================================
-    // SISTEMA DE COORDENADAS CON ZOOM & PAN
+    // COORDINATE TRANSFORMATIONS WITH ZOOM & PAN
     // ==========================================
     mathToScreen(x, y) {
         const spanX = this.view.maxX - this.view.minX;
@@ -161,10 +171,10 @@ class LandscapeRenderer {
     }
 
     /**
-     * Aplica zoom centrado en un punto matemático específico
-     * @param {number} factor - < 1 para acercar, > 1 para alejar
-     * @param {number} centerX - coordenada matemática X de anclaje
-     * @param {number} centerY - coordenada matemática Y de anclaje
+     * Applies zoom centered at a specific mathematical coordinate
+     * @param {number} factor - < 1 to zoom in, > 1 to zoom out
+     * @param {number} centerX - X mathematical anchor
+     * @param {number} centerY - Y mathematical anchor
      */
     zoom(factor, centerX = null, centerY = null) {
         const currentSpanX = this.view.maxX - this.view.minX;
@@ -175,17 +185,17 @@ class LandscapeRenderer {
             centerY = this.view.minY + currentSpanY / 2;
         }
 
-        // Proporción relativa de la posición de anclaje
+        // Relative proportion of anchor position
         const rx = (centerX - this.view.minX) / currentSpanX;
         const ry = (centerY - this.view.minY) / currentSpanY;
 
         let newSpanX = currentSpanX * factor;
         let newSpanY = currentSpanY * factor;
 
-        // Límites de zoom: desde 0.25x (alejado) hasta 60x (ultra-zoom)
+        // Zoom bounds: from 0.25x (overview) to 80x (micro-structure)
         const initSpan = this.problem.domain.maxX - this.problem.domain.minX;
-        const minSpan = initSpan / 60.0;
-        const maxSpan = initSpan * 3.5;
+        const minSpan = initSpan / 80.0;
+        const maxSpan = initSpan * 4.0;
 
         if (newSpanX < minSpan) {
             newSpanX = minSpan;
@@ -200,7 +210,8 @@ class LandscapeRenderer {
         this.view.minY = centerY - ry * newSpanY;
         this.view.maxY = this.view.minY + newSpanY;
 
-        this.groundTruthCanvas = null; // Regenerar buffer en nueva resolución
+        this.groundTruthCanvas = null; // Regenerate buffer at new scale
+        this.idwDirty = true;
         this.notifyViewChange();
     }
 
@@ -213,6 +224,7 @@ class LandscapeRenderer {
             maxY: d.maxY
         };
         this.groundTruthCanvas = null;
+        this.idwDirty = true;
         this.notifyViewChange();
     }
 
@@ -230,7 +242,7 @@ class LandscapeRenderer {
     }
 
     /**
-     * Paleta de colores perceptual Turbo / Spectral
+     * Perceptual Turbo / Spectral color gradient
      */
     getFitnessColor(ratio) {
         const clamped = Math.max(0, Math.min(1, ratio));
@@ -244,25 +256,25 @@ class LandscapeRenderer {
             const t = (clamped - 0.25) / 0.25;
             const r = Math.round(20 + t * (30 - 20));
             const g = Math.round(190 + t * (220 - 190));
-            const b = Math.round(240 - t * (120));
+            const b = Math.round(240 - t * 120);
             return `rgb(${r}, ${g}, ${b})`;
         } else if (clamped < 0.75) {
             const t = (clamped - 0.5) / 0.25;
             const r = Math.round(30 + t * (255 - 30));
-            const g = Math.round(220 - t * (30));
-            const b = Math.round(120 - t * (100));
+            const g = Math.round(220 - t * 30);
+            const b = Math.round(120 - t * 100);
             return `rgb(${r}, ${g}, ${b})`;
         } else {
             const t = (clamped - 0.75) / 0.25;
             const r = 255;
-            const g = Math.round(190 - t * (110));
-            const b = Math.round(20 + t * (210));
+            const g = Math.round(190 - t * 110);
+            const b = Math.round(20 + t * 210);
             return `rgb(${r}, ${g}, ${b})`;
         }
     }
 
     /**
-     * Genera un buffer con el mapa de calor del terreno real en la vista actual
+     * Precomputes offscreen buffer with true fitness heatmap in current view
      */
     generateGroundTruthBuffer() {
         const res = 120;
@@ -300,92 +312,98 @@ class LandscapeRenderer {
     }
 
     /**
-     * Renderizado de la reconstrucción progresiva (IDW) adaptada al zoom
+     * Progressive spatial reconstruction rendering (IDW) adapted to zoom
      */
     renderProgressiveReconstruction() {
         if (this.evaluations.length < 2 || !this.showInterpolation) return;
 
-        const res = 60;
-        const offCanvas = document.createElement("canvas");
-        offCanvas.width = res;
-        offCanvas.height = res;
-        const offCtx = offCanvas.getContext("2d");
-        const imgData = offCtx.createImageData(res, res);
-        const data = imgData.data;
+        if (this.idwDirty || !this.idwCanvas) {
+            const res = 60;
+            const offCanvas = document.createElement("canvas");
+            offCanvas.width = res;
+            offCanvas.height = res;
+            const offCtx = offCanvas.getContext("2d");
+            const imgData = offCtx.createImageData(res, res);
+            const data = imgData.data;
 
-        const v = this.view;
-        const stepX = (v.maxX - v.minX) / res;
-        const stepY = (v.maxY - v.minY) / res;
-        
-        // Radio de revelado alrededor de muestras adaptado al zoom
-        const domainDiagonal = Math.sqrt(Math.pow(v.maxX - v.minX, 2) + Math.pow(v.maxY - v.minY, 2));
-        const maxInfluenceDist = domainDiagonal * 0.28;
+            const v = this.view;
+            const stepX = (v.maxX - v.minX) / res;
+            const stepY = (v.maxY - v.minY) / res;
+            
+            // Influence reveal radius adapted to domain scale
+            const domainDiagonal = Math.sqrt(Math.pow(v.maxX - v.minX, 2) + Math.pow(v.maxY - v.minY, 2));
+            const maxInfluenceDist = domainDiagonal * 0.28;
 
-        const pts = this.evaluations;
+            const pts = this.evaluations;
 
-        for (let j = 0; j < res; j++) {
-            const mathY = v.maxY - j * stepY;
-            for (let i = 0; i < res; i++) {
-                const mathX = v.minX + i * stepX;
+            for (let j = 0; j < res; j++) {
+                const mathY = v.maxY - j * stepY;
+                for (let i = 0; i < res; i++) {
+                    const mathX = v.minX + i * stepX;
 
-                let sumWeight = 0;
-                let sumFitness = 0;
-                let minDist = Infinity;
+                    let sumWeight = 0;
+                    let sumFitness = 0;
+                    let minDist = Infinity;
 
-                for (let k = 0; k < pts.length; k++) {
-                    const pt = pts[k];
-                    const dist = Math.hypot(mathX - pt.x, mathY - pt.y);
-                    if (dist < minDist) minDist = dist;
+                    for (let k = 0; k < pts.length; k++) {
+                        const pt = pts[k];
+                        const dist = Math.hypot(mathX - pt.x, mathY - pt.y);
+                        if (dist < minDist) minDist = dist;
 
-                    if (dist < 0.001) {
-                        sumFitness = pt.percentOfGlobal;
-                        sumWeight = 1;
-                        break;
+                        if (dist < 0.001) {
+                            sumFitness = pt.percentOfGlobal;
+                            sumWeight = 1;
+                            break;
+                        }
+                        const w = 1 / (dist * dist + 1);
+                        sumWeight += w;
+                        sumFitness += w * pt.percentOfGlobal;
                     }
-                    const w = 1 / (dist * dist + 1);
-                    sumWeight += w;
-                    sumFitness += w * pt.percentOfGlobal;
-                }
 
-                const idx = (j * res + i) * 4;
-                if (minDist <= maxInfluenceDist && sumWeight > 0) {
-                    const estRatio = (sumFitness / sumWeight) / 100;
-                    const rgb = this.getFitnessColor(estRatio).match(/\d+/g).map(Number);
-                    
-                    const fade = Math.max(0, 1 - (minDist / maxInfluenceDist));
-                    const alpha = Math.floor(fade * 180);
+                    const idx = (j * res + i) * 4;
+                    if (minDist <= maxInfluenceDist && sumWeight > 0) {
+                        const estRatio = (sumFitness / sumWeight) / 100;
+                        const rgb = this.getFitnessColor(estRatio).match(/\d+/g).map(Number);
+                        
+                        const fade = Math.max(0, 1 - (minDist / maxInfluenceDist));
+                        const alpha = Math.floor(fade * 180);
 
-                    data[idx] = rgb[0];
-                    data[idx + 1] = rgb[1];
-                    data[idx + 2] = rgb[2];
-                    data[idx + 3] = alpha;
-                } else {
-                    data[idx + 3] = 0;
+                        data[idx] = rgb[0];
+                        data[idx + 1] = rgb[1];
+                        data[idx + 2] = rgb[2];
+                        data[idx + 3] = alpha;
+                    } else {
+                        data[idx + 3] = 0;
+                    }
                 }
             }
-        }
 
-        offCtx.putImageData(imgData, 0, 0);
+            offCtx.putImageData(imgData, 0, 0);
+            this.idwCanvas = offCanvas;
+            this.idwDirty = false;
+        }
 
         this.ctx.save();
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.globalAlpha = 0.85;
-        this.ctx.drawImage(offCanvas, 0, 0, this.width, this.height);
+        this.ctx.drawImage(this.idwCanvas, 0, 0, this.width, this.height);
         this.ctx.restore();
     }
 
     /**
-     * Dibuja la cuadrícula adaptativa con graduación dinámica según el nivel de zoom
+     * Draws adaptive mathematical grid with dynamic scale steps based on zoom
+     */
+    /**
+     * Draws adaptive mathematical grid with high-visibility white numbers,
+     * crisp ticks, and prominent coordinate divisions.
      */
     drawGrid() {
         const v = this.view;
         const ctx = this.ctx;
 
         ctx.save();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
-        ctx.lineWidth = 1;
 
-        // Calcular paso "agradable" (nice step) adaptativo
+        // 1. Compute adaptive step
         const spanX = v.maxX - v.minX;
         const roughStep = spanX / 8;
         const power = Math.pow(10, Math.floor(Math.log10(roughStep)));
@@ -396,62 +414,156 @@ class LandscapeRenderer {
 
         const startX = Math.ceil(v.minX / step) * step;
         const startY = Math.ceil(v.minY / step) * step;
-
         const decimals = step < 0.1 ? 3 : (step < 1 ? 2 : (step < 10 ? 1 : 0));
 
-        // Líneas verticales
+        // 2. Draw Grid Lines (thicker and brighter)
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+        ctx.lineWidth = 1.2;
+
         for (let x = startX; x <= v.maxX; x += step) {
             const { px } = this.mathToScreen(x, 0);
             ctx.beginPath();
             ctx.moveTo(px, 0);
             ctx.lineTo(px, this.height);
             ctx.stroke();
-
-            ctx.fillStyle = "rgba(180, 200, 230, 0.45)";
-            ctx.font = "10px 'JetBrains Mono', monospace";
-            ctx.fillText(x.toFixed(decimals), px + 3, this.height - 6);
         }
 
-        // Líneas horizontales
         for (let y = startY; y <= v.maxY; y += step) {
             const { py } = this.mathToScreen(0, y);
             ctx.beginPath();
             ctx.moveTo(0, py);
             ctx.lineTo(this.width, py);
             ctx.stroke();
-
-            ctx.fillStyle = "rgba(180, 200, 230, 0.45)";
-            ctx.font = "10px 'JetBrains Mono', monospace";
-            ctx.fillText(y.toFixed(decimals), 6, py - 4);
         }
 
-        // Ejes centrales (x=0, y=0) si están dentro de la vista
+        // 3. Central Axes (x=0, y=0) in vivid electric cyan with perpendicular tick marks
         if (v.minX <= 0 && v.maxX >= 0) {
             const { px } = this.mathToScreen(0, 0);
-            ctx.strokeStyle = "rgba(0, 220, 255, 0.35)";
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.85)";
+            ctx.lineWidth = 2.0;
             ctx.beginPath();
             ctx.moveTo(px, 0);
             ctx.lineTo(px, this.height);
             ctx.stroke();
+
+            // Ticks across Y axis
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.9)";
+            ctx.lineWidth = 1.8;
+            for (let y = startY; y <= v.maxY; y += step) {
+                const { py } = this.mathToScreen(0, y);
+                ctx.beginPath();
+                ctx.moveTo(px - 5, py);
+                ctx.lineTo(px + 5, py);
+                ctx.stroke();
+            }
         }
 
         if (v.minY <= 0 && v.maxY >= 0) {
             const { py } = this.mathToScreen(0, 0);
-            ctx.strokeStyle = "rgba(0, 220, 255, 0.35)";
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.85)";
+            ctx.lineWidth = 2.0;
             ctx.beginPath();
             ctx.moveTo(0, py);
             ctx.lineTo(this.width, py);
             ctx.stroke();
+
+            // Ticks across X axis
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.9)";
+            ctx.lineWidth = 1.8;
+            for (let x = startX; x <= v.maxX; x += step) {
+                const { px } = this.mathToScreen(x, 0);
+                ctx.beginPath();
+                ctx.moveTo(px, py - 5);
+                ctx.lineTo(px, py + 5);
+                ctx.stroke();
+            }
         }
 
-        // Bordes del dominio original (para que el usuario sepa dónde termina el universo)
+        // 4. Border Ticks & Coordinate Value Badges (pure white, bold, high-contrast)
+        const tickLength = 8;
+        ctx.font = "bold 11px 'JetBrains Mono', monospace";
+
+        // X Coordinate Ticks (bottom and top edges)
+        for (let x = startX; x <= v.maxX; x += step) {
+            const { px } = this.mathToScreen(x, 0);
+
+            // Tick marks
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            ctx.moveTo(px, this.height);
+            ctx.lineTo(px, this.height - tickLength);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(px, 0);
+            ctx.lineTo(px, tickLength);
+            ctx.stroke();
+
+            // Number label with high-contrast background pill
+            const text = x.toFixed(decimals);
+            const textWidth = ctx.measureText(text).width;
+            const badgeW = textWidth + 8;
+            const badgeH = 16;
+            const badgeX = Math.min(this.width - badgeW - 4, Math.max(4, px - badgeW / 2));
+            const badgeY = this.height - badgeH - 5;
+
+            ctx.fillStyle = "rgba(7, 12, 24, 0.9)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(text, badgeX + 4, badgeY + 12);
+        }
+
+        // Y Coordinate Ticks (left and right edges)
+        for (let y = startY; y <= v.maxY; y += step) {
+            const { py } = this.mathToScreen(0, y);
+
+            // Tick marks
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            ctx.moveTo(0, py);
+            ctx.lineTo(tickLength, py);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(this.width, py);
+            ctx.lineTo(this.width - tickLength, py);
+            ctx.stroke();
+
+            // Number label with high-contrast background pill
+            const text = y.toFixed(decimals);
+            const textWidth = ctx.measureText(text).width;
+            const badgeW = textWidth + 8;
+            const badgeH = 16;
+            const badgeX = 6;
+            const badgeY = Math.min(this.height - badgeH - 24, Math.max(6, py - badgeH / 2));
+
+            ctx.fillStyle = "rgba(7, 12, 24, 0.9)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 3);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(text, badgeX + 4, badgeY + 12);
+        }
+
+        // 5. Domain outer boundaries box (vivid amber gold dashed line)
         const d = this.problem.domain;
         const p1 = this.mathToScreen(d.minX, d.maxY);
         const p2 = this.mathToScreen(d.maxX, d.minY);
-        ctx.strokeStyle = "rgba(255, 170, 0, 0.4)";
-        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "rgba(255, 208, 0, 0.9)";
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([8, 4]);
         ctx.strokeRect(p1.px, p1.py, p2.px - p1.px, p2.py - p1.py);
         ctx.setLineDash([]);
 
@@ -459,20 +571,18 @@ class LandscapeRenderer {
     }
 
     /**
-     * Dibuja los puntos explorados
+     * Draws evaluated solution points
      */
     drawEvaluations() {
         const ctx = this.ctx;
         const pts = this.evaluations;
         const v = this.view;
 
-        // Escalar tamaño de puntos ligeramente al hacer mucho zoom
         const zoom = this.getZoomLevel();
         const effectivePointSize = Math.max(4, Math.min(12, this.pointSize * Math.pow(zoom, 0.2)));
 
         for (let i = 0; i < pts.length; i++) {
             const pt = pts[i];
-            // Solo dibujar si está en el viewport
             if (pt.x < v.minX || pt.x > v.maxX || pt.y < v.minY || pt.y > v.maxY) continue;
 
             const { px, py } = this.mathToScreen(pt.x, pt.y);
@@ -493,7 +603,7 @@ class LandscapeRenderer {
             ctx.restore();
         }
 
-        // Destacar el mejor punto
+        // Highlight global best solution
         if (this.bestEvaluation) {
             const b = this.bestEvaluation;
             if (b.x >= v.minX && b.x <= v.maxX && b.y >= v.minY && b.y <= v.maxY) {
@@ -512,7 +622,7 @@ class LandscapeRenderer {
                 ctx.fillStyle = "rgba(10, 15, 30, 0.85)";
                 ctx.strokeStyle = "#ffd700";
                 ctx.lineWidth = 1;
-                const tagText = `★ MEJOR (${b.percentOfGlobal.toFixed(1)}%)`;
+                const tagText = `★ BEST (${b.percentOfGlobal.toFixed(1)}%)`;
                 ctx.font = "bold 11px 'JetBrains Mono', monospace";
                 const textWidth = ctx.measureText(tagText).width;
 
@@ -559,7 +669,7 @@ class LandscapeRenderer {
 
         ctx.fillStyle = "#ff0077";
         ctx.font = "bold 10px 'JetBrains Mono', monospace";
-        ctx.fillText(`Óptimo Global Real (${x0}, ${y0})`, px + 12, py + 4);
+        ctx.fillText(`True Global Optimum (${x0}, ${y0})`, px + 12, py + 4);
         ctx.restore();
     }
 
@@ -659,8 +769,8 @@ class LandscapeRenderer {
 
         ctx.fillStyle = "rgba(200, 220, 240, 0.8)";
         ctx.font = "9px 'JetBrains Mono', monospace";
-        ctx.fillText("0% Aptitud", x, y + barHeight + 12);
-        ctx.fillText("100% Óptimo", x + barWidth - 62, y + barHeight + 12);
+        ctx.fillText("0% Fitness", x, y + barHeight + 12);
+        ctx.fillText("100% Optimum", x + barWidth - 68, y + barHeight + 12);
         ctx.restore();
     }
 
@@ -670,7 +780,7 @@ class LandscapeRenderer {
         ctx.fillStyle = "#0b101c";
         ctx.fillRect(0, 0, this.width, this.height);
 
-        // 1. Modo Dios
+        // 1. God Mode / Teacher Mode
         if (this.showGodMode) {
             if (!this.groundTruthCanvas) {
                 this.generateGroundTruthBuffer();
@@ -680,26 +790,26 @@ class LandscapeRenderer {
             ctx.drawImage(this.groundTruthCanvas, 0, 0, this.width, this.height);
             ctx.restore();
         } else if (this.showFogOfWar) {
-            // 2. Modo Niebla de Guerra
+            // 2. Fog of War Mode (IDW progressive reconstruction)
             this.renderProgressiveReconstruction();
         }
 
-        // 3. Cuadrícula y ejes matemáticos
+        // 3. Mathematical grid and axes
         this.drawGrid();
 
-        // 4. Marcador de óptimo real si Dios está activo
+        // 4. Ground truth optimum target marker if God Mode is active
         this.drawTrueOptimumMarker();
 
-        // 5. Ondas de animación
+        // 5. Click ripple animations
         this.drawRipples();
 
-        // 6. Puntos de soluciones evaluadas
+        // 6. Evaluated solution points
         this.drawEvaluations();
 
-        // 7. Cursor interactivo
+        // 7. Interactive crosshair
         this.drawCrosshair();
 
-        // 8. Barra de color (leyenda)
+        // 8. Fitness colormap legend
         this.drawColorBar();
     }
 
@@ -717,7 +827,7 @@ class LandscapeRenderer {
         });
 
         // ==========================================
-        // EVENTOS DE ZOOM (RUEDA DEL RATÓN)
+        // ZOOM EVENTS (MOUSE WHEEL)
         // ==========================================
         this.canvas.addEventListener("wheel", (e) => {
             e.preventDefault();
@@ -725,16 +835,16 @@ class LandscapeRenderer {
             const px = e.clientX - rect.left;
             const py = e.clientY - rect.top;
 
-            // Coordenada matemática bajo el cursor
+            // Mathematical coordinate under pointer
             const math = this.screenToMath(px, py);
 
-            // Factor de zoom
+            // Zoom factor
             const factor = e.deltaY < 0 ? 0.82 : 1.22;
             this.zoom(factor, math.x, math.y);
         }, { passive: false });
 
         // ==========================================
-        // EVENTOS DE PANORÁMICA (ARRASTRAR MAPA) Y CLICK
+        // PAN AND CLICK EVENTS
         // ==========================================
         this.canvas.addEventListener("mousedown", (e) => {
             const rect = this.canvas.getBoundingClientRect();
@@ -756,7 +866,7 @@ class LandscapeRenderer {
                 const dxScreen = px - this.mouseDownPos.px;
                 const dyScreen = py - this.mouseDownPos.py;
 
-                // Detectar si el usuario está arrastrando (movimiento > 5px)
+                // Detect dragging (threshold > 5px)
                 if (Math.hypot(dxScreen, dyScreen) > 5 || this.isDragging) {
                     this.isDragging = true;
                     this.canvas.style.cursor = "grabbing";
@@ -773,6 +883,7 @@ class LandscapeRenderer {
                     this.view.maxY = this.viewAtMouseDown.maxY + mathDy;
 
                     this.groundTruthCanvas = null;
+                    this.idwDirty = true;
                     this.notifyViewChange();
                 }
             } else {
@@ -787,7 +898,7 @@ class LandscapeRenderer {
                 const py = e.clientY - rect.top;
 
                 if (!this.isDragging) {
-                    // Click limpio sin arrastre -> Evaluar punto
+                    // Clean click without drag -> Evaluate point
                     const coords = this.screenToMath(px, py);
                     if (this.onCanvasClickCallback) {
                         this.onCanvasClickCallback(coords.x, coords.y);
@@ -807,6 +918,13 @@ class LandscapeRenderer {
             this.hoverCoords = null;
             this.canvas.style.cursor = "crosshair";
         });
+    }
+
+    resize() {
+        this.setupDPI();
+        this.idwDirty = true;
+        this.groundTruthCanvas = null;
+        this.notifyViewChange();
     }
 
     onCanvasClick(callback) {

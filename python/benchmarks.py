@@ -1,6 +1,6 @@
 """
-benchmarks.py - Colección matemática de funciones de prueba para optimización
-Compatible con NumPy y diseñado para experimentación pedagógica en Algoritmos Genéticos.
+benchmarks.py - Mathematical collection of optimization benchmark test functions
+NumPy-compatible and designed for pedagogical experiments in Genetic Algorithms.
 """
 
 import math
@@ -10,7 +10,7 @@ import numpy as np
 
 
 class BenchmarkFunction:
-    """Clase base abstracta para funciones de prueba."""
+    """Abstract base class for benchmark test functions."""
     name: str = "Benchmark"
     category: str = "General"
     default_domain: Tuple[float, float, float, float] = (-100.0, 100.0, -100.0, 100.0)
@@ -27,12 +27,12 @@ class BenchmarkFunction:
 
 class SchafferF6(BenchmarkFunction):
     """
-    Función F6 de Schaffer (J. David Schaffer, 1989).
-    Maximización con óptimo global en (x0, y0).
-    f_raw(x0, y0) = 1.0. Rango de salida: [0.0, 1.0].
+    Schaffer's F6 Function (J. David Schaffer, 1989).
+    Maximization problem with global maximum at (x0, y0).
+    f_raw(x0, y0) = 1.0. Output range: [0.0, 1.0].
     """
-    name = "Función F6 de Schaffer"
-    category = "Multimodal / Altamente Deceptiva"
+    name = "Schaffer F6 Function"
+    category = "Multimodal / Highly Deceptive"
     default_domain = (-100.0, 100.0, -100.0, 100.0)
     recommended_random_range = (-75.0, 75.0)
 
@@ -61,11 +61,11 @@ class SchafferF6(BenchmarkFunction):
 
 class Rastrigin(BenchmarkFunction):
     """
-    Función de Rastrigin adaptada para maximización.
-    Óptimo global en (x0, y0) con valor normalizado 1.0.
+    Rastrigin Function adapted for maximization.
+    Global optimum at (x0, y0) with normalized value 1.0.
     """
-    name = "Función de Rastrigin"
-    category = "Multimodal / Retícula de Trampas"
+    name = "Rastrigin Function"
+    category = "Multimodal / Regular Trap Grid"
     default_domain = (-5.12, 5.12, -5.12, 5.12)
     recommended_random_range = (-3.5, 3.5)
 
@@ -92,11 +92,11 @@ class Rastrigin(BenchmarkFunction):
 
 class Ackley(BenchmarkFunction):
     """
-    Función de Ackley invertida para maximización.
-    Óptimo global en (x0, y0) con valor normalizado 1.0.
+    Ackley Function inverted for maximization.
+    Global optimum at (x0, y0) with normalized value 1.0.
     """
-    name = "Función de Ackley"
-    category = "Casi Plana con Embudo Profundo"
+    name = "Ackley Function"
+    category = "Nearly Flat Outer Plateau with Deep Funnel"
     default_domain = (-30.0, 30.0, -30.0, 30.0)
     recommended_random_range = (-20.0, 20.0)
 
@@ -125,10 +125,10 @@ class Ackley(BenchmarkFunction):
 
 class Rosenbrock(BenchmarkFunction):
     """
-    Valle de Rosenbrock (Banana) para maximización.
+    Rosenbrock Valley (Banana Function) for maximization.
     """
-    name = "Valle de Rosenbrock (Banana)"
-    category = "Valle Estrecho y Curvado"
+    name = "Rosenbrock Valley (Banana Function)"
+    category = "Narrow Curved Valley"
     default_domain = (-3.0, 3.0, -2.0, 4.0)
     recommended_random_range = (-1.5, 1.5)
 
@@ -149,10 +149,10 @@ class Rosenbrock(BenchmarkFunction):
 
 class Himmelblau(BenchmarkFunction):
     """
-    Función de Himmelblau con 4 máximos.
+    Himmelblau Function with 4 global maxima.
     """
-    name = "Función de Himmelblau"
-    category = "Multimodal (4 Máximos Idénticos)"
+    name = "Himmelblau Function"
+    category = "Multimodal (4 Identical Optima)"
     default_domain = (-5.0, 5.0, -5.0, 5.0)
     recommended_random_range = (-1.0, 1.0)
 
@@ -186,18 +186,21 @@ BENCHMARK_REGISTRY: Dict[str, Any] = {
 
 class OptimizationProblem:
     """
-    Instancia de problema de optimización con parámetros configurados.
-    Permite fijar o aleatorizar el centro y el máximo global teórico.
+    Optimization problem instance with configurable parameters.
+    Supports fixed or randomized center, theoretical global maximum,
+    and domain scale multiplier to showcase the failure of blind search.
     """
     def __init__(
         self,
         benchmark_name: str = "schaffer_f6",
-        center_mode: str = "fixed",       # 'fixed' o 'random'
-        max_mode: str = "fixed",          # 'fixed' o 'random'
+        center_mode: str = "fixed",       # 'fixed' or 'random'
+        max_mode: str = "fixed",          # 'fixed' or 'random'
         fixed_x0: float = 0.0,
         fixed_y0: float = 0.0,
         fixed_max: float = 1.0,
         frequency: float = 1.0,
+        domain_scale: float = 1.0,
+        custom_domain: Optional[Tuple[float, float, float, float]] = None,
         random_seed: Optional[int] = None
     ):
         if random_seed is not None:
@@ -205,21 +208,35 @@ class OptimizationProblem:
             np.random.seed(random_seed)
 
         self.benchmark_cls = BENCHMARK_REGISTRY.get(benchmark_name, SchafferF6)
-        self.domain = self.benchmark_cls.default_domain
+        self.domain_scale = domain_scale
+
+        if custom_domain is not None:
+            self.domain = custom_domain
+        else:
+            base = self.benchmark_cls.default_domain
+            self.domain = (
+                base[0] * domain_scale,
+                base[1] * domain_scale,
+                base[2] * domain_scale,
+                base[3] * domain_scale
+            )
+
         self.min_x, self.max_x, self.min_y, self.max_y = self.domain
         self.frequency = frequency
 
-        # Configurar centro
+        # Center configuration
         self.center_mode = center_mode
         if center_mode == "random":
             rmin, rmax = self.benchmark_cls.recommended_random_range
-            self.x0 = round(random.uniform(rmin, rmax), 2)
-            self.y0 = round(random.uniform(rmin, rmax), 2)
+            scaled_rmin = rmin * domain_scale
+            scaled_rmax = rmax * domain_scale
+            self.x0 = round(random.uniform(scaled_rmin, scaled_rmax), 2)
+            self.y0 = round(random.uniform(scaled_rmin, scaled_rmax), 2)
         else:
             self.x0 = fixed_x0
             self.y0 = fixed_y0
 
-        # Configurar máximo global teórico
+        # Theoretical global maximum configuration
         self.max_mode = max_mode
         if max_mode == "random":
             self.global_max = round(random.uniform(100.0, 500.0), 1)
@@ -229,12 +246,12 @@ class OptimizationProblem:
         self.evaluations_count = 0
 
     def set_frequency(self, freq: float) -> None:
-        """Permite calibrar la frecuencia de oscilación dinámicamente."""
+        """Dynamically calibrate oscillation frequency."""
         self.frequency = max(0.1, min(10.0, freq))
 
     def evaluate(self, x: float, y: float) -> Dict[str, Any]:
         """
-        Evalúa un punto individual y cuenta las llamadas a la función de aptitud.
+        Evaluates a single candidate point and tracks function evaluation calls.
         """
         self.evaluations_count += 1
         clamped_x = max(self.min_x, min(self.max_x, x))
@@ -258,13 +275,13 @@ class OptimizationProblem:
         }
 
     def generate_random_individual(self) -> Tuple[float, float]:
-        """Genera un punto aleatorio uniforme dentro del espacio de búsqueda."""
+        """Generates a uniform random candidate point within the search domain."""
         rx = random.uniform(self.min_x, self.max_x)
         ry = random.uniform(self.min_y, self.max_y)
         return round(rx, 4), round(ry, 4)
 
     def evaluate_mesh(self, num_points: int = 150) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Genera una malla 2D para visualización con matplotlib."""
+        """Generates a 2D mesh grid for matplotlib visualization."""
         xs = np.linspace(self.min_x, self.max_x, num_points)
         ys = np.linspace(self.min_y, self.max_y, num_points)
         X, Y = np.meshgrid(xs, ys)

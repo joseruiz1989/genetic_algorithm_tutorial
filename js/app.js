@@ -1,16 +1,22 @@
 /**
- * app.js - Controlador principal de la aplicación
- * Gestiona el estado, eventos de la interfaz, actualización de métricas,
- * sincronización entre vistas 2D/3D y exportación de datos.
+ * app.js - Main Application Controller
+ * Manages application state, UI event listeners, metric tracking,
+ * 2D/3D viewport synchronization, and CSV data export.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Elementos del DOM
+    // 1. DOM Element Selectors
     const canvas2D = document.getElementById("canvas2D");
     const container3D = document.getElementById("container3D");
     const convergenceChartCanvas = document.getElementById("convergenceChart");
 
     const selectBenchmark = document.getElementById("selectBenchmark");
+    const selectDomainScale = document.getElementById("selectDomainScale");
+    const badgeDomainInfo = document.getElementById("badgeDomainInfo");
+    const customDomainRow = document.getElementById("customDomainRow");
+    const customMinCoord = document.getElementById("customMinCoord");
+    const customMaxCoord = document.getElementById("customMaxCoord");
+
     const centerFixed = document.getElementById("centerFixed");
     const centerRandom = document.getElementById("centerRandom");
     const maxFixed = document.getElementById("maxFixed");
@@ -26,6 +32,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnRandom25 = document.getElementById("btnRandom25");
     const btnRandom100 = document.getElementById("btnRandom100");
     const btnEvolveGA = document.getElementById("btnEvolveGA");
+    const btnStepGA = document.getElementById("btnStepGA");
+    const btnResetGA = document.getElementById("btnResetGA");
+    const sliderGaPopSize = document.getElementById("sliderGaPopSize");
+    const valGaPopSize = document.getElementById("valGaPopSize");
+    const sliderGaGenerations = document.getElementById("sliderGaGenerations");
+    const valGaGenerations = document.getElementById("valGaGenerations");
+    const sliderGaElitism = document.getElementById("sliderGaElitism");
+    const valGaElitism = document.getElementById("valGaElitism");
+    const badgeGaBudget = document.getElementById("badgeGaBudget");
+
+    // Toolbar direct GA action controls
+    const btnToolbarEvolveGA = document.getElementById("btnToolbarEvolveGA");
+    const btnToolbarStepGA = document.getElementById("btnToolbarStepGA");
+    const btnToolbarResetGA = document.getElementById("btnToolbarResetGA");
+    const badgeToolbarGaGen = document.getElementById("badgeToolbarGaGen");
 
     const tabView2D = document.getElementById("tabView2D");
     const tabView3D = document.getElementById("tabView3D");
@@ -56,20 +77,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnCloseTheoryModal = document.getElementById("btnCloseTheoryModal");
     const btnModalUnderstood = document.getElementById("btnModalUnderstood");
 
-    // Elementos de calibración de Frecuencia
+    // Frequency Calibration Controls
     const sliderFrequency = document.getElementById("sliderFrequency");
     const valFrequency = document.getElementById("valFrequency");
     const groupFrequency = document.getElementById("groupFrequency");
     const freqButtons = document.querySelectorAll(".freq-btn");
 
-    // Elementos de Zoom y Pan
+    // Zoom and Pan Controls
     const btnZoomIn = document.getElementById("btnZoomIn");
     const btnZoomOut = document.getElementById("btnZoomOut");
     const btnZoomReset = document.getElementById("btnZoomReset");
     const badgeZoomLevel = document.getElementById("badgeZoomLevel");
     const hudZoom = document.getElementById("hudZoom");
 
-    // 2. Estado de la Aplicación
+    // 2. Application State
     let currentProblem = null;
     let renderer2D = null;
     let viewer3D = null;
@@ -77,30 +98,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let evaluationHistory = [];
     let bestEvaluation = null;
-    let convergenceHistory = []; // { evalNum, bestFitness }
+    let convergenceHistory = []; // { evalNum, bestFitness, currentFitness }
 
-    // 3. Inicialización del problema
+    // 3. Problem Instantiation
     function createNewProblem() {
         const benchmarkId = selectBenchmark.value;
         const centerMode = centerRandom.checked ? "random" : "fixed";
         const maxMode = maxRandom.checked ? "random" : "fixed";
         const freqVal = sliderFrequency ? parseFloat(sliderFrequency.value) : 1.0;
 
+        // Domain Scale & Custom Bounds Handling
+        const domainScaleVal = selectDomainScale ? selectDomainScale.value : "1";
+        let domainScale = 1.0;
+        let customDomain = null;
+
+        if (domainScaleVal === "custom") {
+            if (customDomainRow) customDomainRow.style.display = "grid";
+            const cMin = parseFloat(customMinCoord.value) || -100;
+            const cMax = parseFloat(customMaxCoord.value) || 100;
+            customDomain = { minX: cMin, maxX: cMax, minY: cMin, maxY: cMax };
+            if (badgeDomainInfo) badgeDomainInfo.textContent = `[${cMin}, ${cMax}]`;
+        } else {
+            if (customDomainRow) customDomainRow.style.display = "none";
+            domainScale = parseFloat(domainScaleVal) || 1.0;
+            if (badgeDomainInfo) {
+                if (domainScale === 1) badgeDomainInfo.textContent = "1x Standard";
+                else if (domainScale === 2) badgeDomainInfo.textContent = "2x (4x Area)";
+                else if (domainScale === 5) badgeDomainInfo.textContent = "5x (25x Area)";
+                else if (domainScale === 10) badgeDomainInfo.textContent = "10x (100x Area)";
+                else badgeDomainInfo.textContent = `${domainScale}x Scale`;
+            }
+        }
+
         currentProblem = new OptimizationProblem(benchmarkId, {
             centerMode: centerMode,
             maxMode: maxMode,
-            frequency: freqVal
+            frequency: freqVal,
+            domainScale: domainScale,
+            customDomain: customDomain
         });
 
-        // Visibilidad del calibrador de frecuencia (solo relevante para Schaffer F6)
+        // Toggle frequency calibration slider (primarily relevant for Schaffer F6)
         if (groupFrequency) {
             groupFrequency.style.display = (benchmarkId === "schaffer_f6") ? "block" : "none";
         }
 
         sessionBadge.textContent = `ID: ${currentProblem.seedId}`;
-        hudDomain.textContent = `Dominio: [${currentProblem.domain.minX}, ${currentProblem.domain.maxX}]`;
+        hudDomain.textContent = `Domain: [${currentProblem.domain.minX}, ${currentProblem.domain.maxX}] × [${currentProblem.domain.minY}, ${currentProblem.domain.maxY}]`;
 
-        // Colocar placeholders representativos en los inputs manuales
+        // Update coordinate input placeholders and range limits
         const midX = ((currentProblem.domain.minX + currentProblem.domain.maxX) / 2).toFixed(1);
         const midY = ((currentProblem.domain.minY + currentProblem.domain.maxY) / 2).toFixed(1);
         inputCoordX.placeholder = midX;
@@ -110,12 +156,12 @@ document.addEventListener("DOMContentLoaded", () => {
         inputCoordY.min = currentProblem.domain.minY;
         inputCoordY.max = currentProblem.domain.maxY;
 
-        // Resetear historial
+        // Reset history
         evaluationHistory = [];
         bestEvaluation = null;
         convergenceHistory = [];
 
-        // Inicializar o actualizar motores
+        // Initialize or update rendering engines
         if (!renderer2D) {
             renderer2D = new LandscapeRenderer(canvas2D, currentProblem, {
                 showGodMode: toggleGodMode.checked,
@@ -145,17 +191,23 @@ document.addEventListener("DOMContentLoaded", () => {
             viewer3D.setProblem(currentProblem);
         }
 
+        const gaPop = sliderGaPopSize ? parseInt(sliderGaPopSize.value) : 30;
+        const gaEli = sliderGaElitism ? parseInt(sliderGaElitism.value) : 2;
+
         if (!gaEngine) {
-            gaEngine = new MiniGeneticAlgorithm(currentProblem);
+            gaEngine = new MiniGeneticAlgorithm(currentProblem, { popSize: gaPop, elitismCount: gaEli });
         } else {
             gaEngine.setProblem(currentProblem);
+            gaEngine.updateConfig({ popSize: gaPop, elitismCount: gaEli });
         }
+
+        if (badgeToolbarGaGen) badgeToolbarGaGen.textContent = `Gen 0`;
 
         updateUI();
         drawConvergenceChart();
     }
 
-    // 4. Evaluación y Registro de un individuo
+    // 4. Evaluation and Registration of Candidate Solutions
     function evaluateAndRegister(x, y) {
         const result = currentProblem.evaluate(x, y);
         result.id = evaluationHistory.length + 1;
@@ -163,19 +215,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
         evaluationHistory.push(result);
 
-        // Actualizar mejor individuo global
+        // Update best global individual
         if (!bestEvaluation || result.fitness > bestEvaluation.fitness) {
             bestEvaluation = result;
         }
 
-        // Registrar en historial de convergencia
+        // Record in convergence history
         convergenceHistory.push({
             evalNum: evaluationHistory.length,
             bestFitness: bestEvaluation.fitness,
             currentFitness: result.fitness
         });
 
-        // Enviar a los renderizadores
+        // Dispatch to renderers
         renderer2D.addEvaluation(result);
         if (viewer3D) {
             viewer3D.addEvaluation(result);
@@ -215,7 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
         drawConvergenceChart();
     }
 
-    // 5. Actualización de Interfaz y Métricas
+    // 5. Interface and Metric Updates
     function updateUI() {
         const total = evaluationHistory.length;
         statEvaluations.textContent = total;
@@ -226,65 +278,65 @@ document.addEventListener("DOMContentLoaded", () => {
             statBestFitness.textContent = bestEvaluation.fitness.toFixed(4);
             statBestCoords.textContent = `(${bestEvaluation.x.toFixed(2)}, ${bestEvaluation.y.toFixed(2)})`;
 
-            // SVG Radial Progress (circunferencia = 2 * PI * 45 ≈ 283)
+            // SVG Radial Progress (circumference = 2 * PI * 45 ≈ 283)
             const circumference = 283;
             const offset = circumference - (pct / 100) * circumference;
             radialProgressBar.style.strokeDashoffset = offset;
 
-            // Color del arco según aptitud
+            // Arc color & status message based on fitness proximity
             if (pct < 40) {
                 radialProgressBar.style.stroke = "#00e5ff";
-                metricStatusBadge.textContent = "Búsqueda inicial a ciegas";
+                metricStatusBadge.textContent = "Initial blind search phase";
                 metricStatusBadge.style.color = "#00e5ff";
                 metricStatusBadge.style.borderColor = "rgba(0, 229, 255, 0.3)";
             } else if (pct < 75) {
                 radialProgressBar.style.stroke = "#00f090";
-                metricStatusBadge.textContent = "Atrapado en cresta / óptimo local";
+                metricStatusBadge.textContent = "Trapped in local ridge / optimum";
                 metricStatusBadge.style.color = "#00f090";
                 metricStatusBadge.style.borderColor = "rgba(0, 240, 144, 0.3)";
             } else if (pct < 98) {
                 radialProgressBar.style.stroke = "#ffd000";
-                metricStatusBadge.textContent = "¡Cuenca del óptimo global detectada!";
+                metricStatusBadge.textContent = "Global optimum basin discovered!";
                 metricStatusBadge.style.color = "#ffd000";
                 metricStatusBadge.style.borderColor = "rgba(255, 208, 0, 0.4)";
             } else {
                 radialProgressBar.style.stroke = "#ff0077";
-                metricStatusBadge.textContent = "🏆 ¡Óptimo global resuelto (98%+)!";
+                metricStatusBadge.textContent = "🏆 Global optimum resolved (98%+)!";
                 metricStatusBadge.style.color = "#ff0077";
                 metricStatusBadge.style.borderColor = "rgba(255, 0, 119, 0.5)";
             }
 
-            // Distancia al óptimo
+            // Distance to optimum
             if (toggleGodMode.checked || pct > 98) {
-                statBestDistance.textContent = `${bestEvaluation.distanceToOptimum.toFixed(2)} u`;
+                statBestDistance.textContent = `${bestEvaluation.distanceToOptimum.toFixed(2)} units`;
             } else {
-                statBestDistance.textContent = "Oculta (Modo ciego)";
+                statBestDistance.textContent = "Hidden (Blind mode)";
             }
         } else {
             metricPercent.textContent = "0.0%";
             radialProgressBar.style.strokeDashoffset = 283;
             radialProgressBar.style.stroke = "var(--accent-gold)";
-            metricStatusBadge.textContent = "Esperando primera solución...";
+            metricStatusBadge.textContent = "Waiting for first solution...";
             statBestFitness.textContent = "-";
             statBestCoords.textContent = "-";
             statBestDistance.textContent = "-";
         }
 
-        // Mostrar u ocultar verdad fundamental
+        // Show or hide ground truth optimum info
         if (toggleGodMode.checked) {
             rowTrueOptimum.style.display = "flex";
-            statTrueFitness.textContent = `${currentProblem.globalMaxFitness.toFixed(2)} en (${currentProblem.x0}, ${currentProblem.y0})`;
+            statTrueFitness.textContent = `${currentProblem.globalMaxFitness.toFixed(2)} at (${currentProblem.x0}, ${currentProblem.y0})`;
         } else {
             rowTrueOptimum.style.display = "none";
         }
 
-        // Actualizar tabla de historial (últimos 15 puntos ordenados de más reciente a más antiguo)
+        // Render history table (last 15 points, newest first)
         renderHistoryTable();
     }
 
     function renderHistoryTable() {
         if (evaluationHistory.length === 0) {
-            historyTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 12px;">Sin datos aún</td></tr>`;
+            historyTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-dim); padding: 12px;">No evaluations yet</td></tr>`;
             return;
         }
 
@@ -307,7 +359,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }).join("");
     }
 
-    // 6. Gráfico de Convergencia en Canvas
+    // 6. Convergence Chart Rendering
     function drawConvergenceChart() {
         const ctx = convergenceChartCanvas.getContext("2d");
         const w = convergenceChartCanvas.clientWidth || 300;
@@ -323,7 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (convergenceHistory.length < 2) {
             ctx.fillStyle = "rgba(142, 155, 181, 0.4)";
             ctx.font = "10px 'JetBrains Mono', monospace";
-            ctx.fillText("Inserta puntos para ver convergencia...", 10, h / 2);
+            ctx.fillText("Evaluate points to plot convergence...", 10, h / 2);
             chartMaxEval.textContent = `#${evaluationHistory.length}`;
             return;
         }
@@ -332,9 +384,8 @@ document.addEventListener("DOMContentLoaded", () => {
         chartMaxEval.textContent = `#${count}`;
 
         const maxFit = currentProblem.globalMaxFitness;
-        const minFit = 0;
 
-        // Dibujar línea de óptimo teórico
+        // Plot theoretical optimum ceiling line
         const optY = 10;
         ctx.strokeStyle = "rgba(255, 0, 85, 0.3)";
         ctx.setLineDash([3, 3]);
@@ -344,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Trazar curva de mejor fitness encontrado acumulado
+        // Plot accumulated best fitness curve
         ctx.beginPath();
         for (let i = 0; i < count; i++) {
             const item = convergenceHistory[i];
@@ -364,21 +415,28 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.shadowBlur = 0;
     }
 
-    // 7. Eventos de la Interfaz
-    // Cambio de benchmark o parámetros
+    // 7. UI Event Handlers
+    // Benchmark & parameter changes
     selectBenchmark.addEventListener("change", createNewProblem);
+    if (selectDomainScale) {
+        selectDomainScale.addEventListener("change", createNewProblem);
+    }
+    if (customMinCoord && customMaxCoord) {
+        customMinCoord.addEventListener("change", createNewProblem);
+        customMaxCoord.addEventListener("change", createNewProblem);
+    }
     centerFixed.addEventListener("change", createNewProblem);
     centerRandom.addEventListener("change", createNewProblem);
     maxFixed.addEventListener("change", createNewProblem);
     maxRandom.addEventListener("change", createNewProblem);
     btnResetProblem.addEventListener("click", createNewProblem);
 
-    // Entrada Manual
+    // Manual Coordinate Input
     btnEvalManual.addEventListener("click", () => {
         const x = parseFloat(inputCoordX.value);
         const y = parseFloat(inputCoordY.value);
         if (isNaN(x) || isNaN(y)) {
-            alert("Por favor introduce valores numéricos válidos para X e Y.");
+            alert("Please enter valid numerical values for X and Y coordinates.");
             return;
         }
         evaluateAndRegister(x, y);
@@ -390,7 +448,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // Muestreo Aleatorio
+    // Random Monte Carlo Sampling
     function addRandomSamples(n) {
         const batch = [];
         for (let i = 0; i < n; i++) {
@@ -404,21 +462,92 @@ document.addEventListener("DOMContentLoaded", () => {
     btnRandom25.addEventListener("click", () => addRandomSamples(25));
     btnRandom100.addEventListener("click", () => addRandomSamples(100));
 
-    // Evolución con Algoritmo Genético
-    btnEvolveGA.addEventListener("click", () => {
-        // Sembrar con individuos previos si existen
+    // ==========================================
+    // GA HYPERPARAMETER CONTROLLERS & ACTIONS
+    // ==========================================
+    function updateGaControls() {
+        const pop = sliderGaPopSize ? parseInt(sliderGaPopSize.value) : 30;
+        const gen = sliderGaGenerations ? parseInt(sliderGaGenerations.value) : 10;
+        const eli = sliderGaElitism ? parseInt(sliderGaElitism.value) : 2;
+
+        if (valGaPopSize) valGaPopSize.textContent = pop;
+        if (valGaGenerations) valGaGenerations.textContent = gen;
+        if (valGaElitism) valGaElitism.textContent = eli;
+        if (badgeGaBudget) badgeGaBudget.textContent = `${pop} ind × ${gen} gen = ${pop * gen} evals`;
+        if (btnEvolveGA) btnEvolveGA.textContent = `⚡ Run Full Evolution (${gen} gens)`;
+        if (btnToolbarEvolveGA) btnToolbarEvolveGA.textContent = `⚡ Run GA (${gen}g)`;
+
+        if (gaEngine) {
+            gaEngine.updateConfig({ popSize: pop, elitismCount: eli });
+            if (badgeToolbarGaGen) badgeToolbarGaGen.textContent = `Gen ${gaEngine.generation}`;
+        }
+    }
+
+    if (sliderGaPopSize) sliderGaPopSize.addEventListener("input", updateGaControls);
+    if (sliderGaGenerations) sliderGaGenerations.addEventListener("input", updateGaControls);
+    if (sliderGaElitism) sliderGaElitism.addEventListener("input", updateGaControls);
+
+    function executeFullGa() {
+        const pop = sliderGaPopSize ? parseInt(sliderGaPopSize.value) : 30;
+        const gen = sliderGaGenerations ? parseInt(sliderGaGenerations.value) : 10;
+        const eli = sliderGaElitism ? parseInt(sliderGaElitism.value) : 2;
+
+        gaEngine.updateConfig({ popSize: pop, elitismCount: eli });
+
+        // Seed GA with recent evaluations if available
         if (evaluationHistory.length > 0) {
-            gaEngine.initPopulation(evaluationHistory.slice(-25));
+            gaEngine.initPopulation(evaluationHistory.slice(-pop));
         } else {
             gaEngine.reset();
         }
 
-        // Ejecutar 10 generaciones
-        const evolvedPoints = gaEngine.runGenerations(10);
+        // Run generations
+        const evolvedPoints = gaEngine.runGenerations(gen);
         evaluateBatch(evolvedPoints);
-    });
 
-    // Pestañas 2D / 3D
+        if (badgeToolbarGaGen) badgeToolbarGaGen.textContent = `Gen ${gaEngine.generation}`;
+    }
+
+    function executeStepGa() {
+        const pop = sliderGaPopSize ? parseInt(sliderGaPopSize.value) : 30;
+        const eli = sliderGaElitism ? parseInt(sliderGaElitism.value) : 2;
+        gaEngine.updateConfig({ popSize: pop, elitismCount: eli });
+
+        if (gaEngine.population.length === 0) {
+            if (evaluationHistory.length > 0) {
+                gaEngine.initPopulation(evaluationHistory.slice(-pop));
+            } else {
+                gaEngine.reset();
+            }
+        }
+
+        const stepPoints = gaEngine.stepGeneration();
+        evaluateBatch(stepPoints);
+
+        if (badgeToolbarGaGen) badgeToolbarGaGen.textContent = `Gen ${gaEngine.generation}`;
+    }
+
+    function executeResetGa() {
+        const pop = sliderGaPopSize ? parseInt(sliderGaPopSize.value) : 30;
+        const eli = sliderGaElitism ? parseInt(sliderGaElitism.value) : 2;
+        gaEngine.updateConfig({ popSize: pop, elitismCount: eli });
+        gaEngine.reset();
+        if (badgeToolbarGaGen) badgeToolbarGaGen.textContent = `Gen 0`;
+    }
+
+    // Full GA Evolution execution from sidebar and toolbar
+    if (btnEvolveGA) btnEvolveGA.addEventListener("click", executeFullGa);
+    if (btnToolbarEvolveGA) btnToolbarEvolveGA.addEventListener("click", executeFullGa);
+
+    // Step 1 generation from sidebar and toolbar
+    if (btnStepGA) btnStepGA.addEventListener("click", executeStepGa);
+    if (btnToolbarStepGA) btnToolbarStepGA.addEventListener("click", executeStepGa);
+
+    // Reset GA population from sidebar and toolbar
+    if (btnResetGA) btnResetGA.addEventListener("click", executeResetGa);
+    if (btnToolbarResetGA) btnToolbarResetGA.addEventListener("click", executeResetGa);
+
+    // 2D / 3D Viewport Tabs
     tabView2D.addEventListener("click", () => {
         tabView2D.classList.add("active");
         tabView3D.classList.remove("active");
@@ -436,7 +565,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Toggles de visualización
+    // Visualization Toggles
     toggleInterpolation.addEventListener("change", () => {
         renderer2D.showInterpolation = toggleInterpolation.checked;
     });
@@ -452,14 +581,16 @@ document.addEventListener("DOMContentLoaded", () => {
         convergenceHistory = [];
         renderer2D.clearEvaluations();
         if (viewer3D) viewer3D.clearPoints();
+        if (gaEngine) gaEngine.reset();
+        if (badgeToolbarGaGen) badgeToolbarGaGen.textContent = `Gen 0`;
         updateUI();
         drawConvergenceChart();
     });
 
-    // Exportación a CSV
+    // CSV Data Export
     btnExportCSV.addEventListener("click", () => {
         if (evaluationHistory.length === 0) {
-            alert("No hay evaluaciones registradas para exportar.");
+            alert("No evaluations recorded to export.");
             return;
         }
 
@@ -480,13 +611,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `optimizacion_${currentProblem.benchmark.id}_${currentProblem.seedId}.csv`);
+        link.setAttribute("download", `optimization_${currentProblem.benchmark.id}_${currentProblem.seedId}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     });
 
-    // Modal Pedagógico
+    // Theory & Pedagogical Modal
     btnOpenTheoryModal.addEventListener("click", () => {
         theoryModal.classList.add("active");
     });
@@ -501,7 +632,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ==========================================
-    // CONTROLADORES DE CALIBRACIÓN DE FRECUENCIA
+    // FREQUENCY CALIBRATION CONTROLLERS
     // ==========================================
     function updateFrequency(freq) {
         freq = Math.max(0.2, Math.min(5.0, parseFloat(freq)));
@@ -522,10 +653,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (currentProblem) {
             currentProblem.setFrequency(freq);
             if (renderer2D) {
-                renderer2D.groundTruthCanvas = null; // invalidar buffer para redibujar
+                renderer2D.groundTruthCanvas = null; // invalidate ground truth cache to redraw
             }
             if (viewer3D && viewer3D.isInitialized) {
-                viewer3D.buildSurface(); // regenerar malla 3D con nueva frecuencia
+                viewer3D.buildSurface(); // regenerate 3D surface mesh
             }
         }
     }
@@ -543,7 +674,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ==========================================
-    // CONTROLADORES DE ZOOM Y PAN
+    // ZOOM AND PAN CONTROLLERS
     // ==========================================
     if (btnZoomIn) {
         btnZoomIn.addEventListener("click", () => {
@@ -561,6 +692,81 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Iniciar con la primera instancia del problema
+    // ==========================================
+    // MODULE TAB SWITCHER (Landscape vs N-Queens)
+    // ==========================================
+    const tabModuleLandscape = document.getElementById("tabModuleLandscape");
+    const tabModuleNQueens = document.getElementById("tabModuleNQueens");
+    const moduleLandscape = document.getElementById("moduleLandscape");
+    const moduleNQueens = document.getElementById("moduleNQueens");
+    const brandSubtitle = document.getElementById("brandSubtitle");
+
+    let nqueensUI = null;
+
+    function switchModule(moduleName) {
+        if (moduleName === "nqueens") {
+            if (tabModuleLandscape) tabModuleLandscape.classList.remove("active");
+            if (tabModuleNQueens) tabModuleNQueens.classList.add("active");
+            if (moduleLandscape) moduleLandscape.style.display = "none";
+            if (moduleNQueens) moduleNQueens.style.display = "grid";
+            if (brandSubtitle) {
+                brandSubtitle.textContent = "Module 2: The N-Queens Problem & Combinatorial Optimization (4, 8, 16 Queens)";
+            }
+
+            // Instantiate or refresh N-Queens UI
+            if (!nqueensUI && window.NQueensUI) {
+                nqueensUI = new window.NQueensUI();
+            } else if (nqueensUI) {
+                nqueensUI.renderBoard();
+                nqueensUI.drawThreatLines();
+                nqueensUI.drawConvergenceChart();
+            }
+        } else {
+            if (tabModuleNQueens) tabModuleNQueens.classList.remove("active");
+            if (tabModuleLandscape) tabModuleLandscape.classList.add("active");
+            if (moduleNQueens) moduleNQueens.style.display = "none";
+            if (moduleLandscape) moduleLandscape.style.display = "grid";
+            if (brandSubtitle) {
+                brandSubtitle.textContent = "Module 1: The Curse of Blind Search in Deceptive Landscapes (Schaffer's F6)";
+            }
+
+            // Resize 2D/3D viewport canvases
+            setTimeout(() => {
+                if (renderer2D) renderer2D.resize();
+                if (viewer3D && viewer3D.isInitialized) viewer3D.onResize();
+            }, 60);
+        }
+    }
+
+    // Expose globally
+    window.switchAppModule = switchModule;
+
+    if (tabModuleLandscape) {
+        tabModuleLandscape.addEventListener("click", () => switchModule("landscape"));
+    }
+    if (tabModuleNQueens) {
+        tabModuleNQueens.addEventListener("click", () => switchModule("nqueens"));
+    }
+
+    // URL Hash Routing Support (#nqueens or #landscape)
+    window.addEventListener("hashchange", () => {
+        if (location.hash === "#nqueens" || location.hash === "#n-reinas") {
+            switchModule("nqueens");
+        } else if (location.hash === "#landscape" || location.hash === "#f6") {
+            switchModule("landscape");
+        }
+    });
+
+    // Pre-initialize N-Queens in background so DOM is ready when switched
+    if (window.NQueensUI) {
+        nqueensUI = new window.NQueensUI();
+    }
+
+    if (location.hash === "#nqueens" || location.hash === "#n-reinas") {
+        switchModule("nqueens");
+    }
+
+    // Launch with initial problem instance
     createNewProblem();
 });
+

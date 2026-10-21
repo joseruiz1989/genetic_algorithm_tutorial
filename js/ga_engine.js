@@ -1,21 +1,22 @@
 /**
- * ga_engine.js - Motor pedagógico de Algoritmo Genético de valores reales
- * Implementa de forma transparente y didáctica:
- * - Selección por Torneo
- * - Cruzamiento Aritmético / BLX-alpha
- * - Mutación Gaussiana adaptativa
- * - Elitismo
+ * ga_engine.js - Pedagogical Real-Coded Genetic Algorithm Engine
+ * Implements standard evolutionary operators transparently:
+ * - Configurable Population Size (N)
+ * - Configurable Generations (G)
+ * - Configurable Elitism Count (E)
+ * - Tournament Selection (k=3)
+ * - Arithmetic / Intermediate Blended Crossover
+ * - Adaptive Gaussian Mutation with domain boundary clamping
  */
 
 class MiniGeneticAlgorithm {
     constructor(problem, config = {}) {
         this.problem = problem;
-        this.popSize = config.popSize || 25;
+        this.popSize = config.popSize || 30;
         this.crossoverRate = config.crossoverRate || 0.85;
         this.mutationRate = config.mutationRate || 0.25;
-        this.mutationSigma = config.mutationSigma || 3.0; // Desviación estándar para mutación
         this.tournamentSize = config.tournamentSize || 3;
-        this.elitismCount = config.elitismCount || 2;
+        this.elitismCount = config.elitismCount !== undefined ? config.elitismCount : 2;
 
         this.population = [];
         this.generation = 0;
@@ -30,6 +31,14 @@ class MiniGeneticAlgorithm {
         this.reset();
     }
 
+    updateConfig(config = {}) {
+        if (config.popSize !== undefined) this.popSize = config.popSize;
+        if (config.crossoverRate !== undefined) this.crossoverRate = config.crossoverRate;
+        if (config.mutationRate !== undefined) this.mutationRate = config.mutationRate;
+        if (config.tournamentSize !== undefined) this.tournamentSize = config.tournamentSize;
+        if (config.elitismCount !== undefined) this.elitismCount = Math.min(this.popSize, config.elitismCount);
+    }
+
     reset() {
         this.population = [];
         this.generation = 0;
@@ -42,14 +51,14 @@ class MiniGeneticAlgorithm {
         this.population = [];
         const d = this.problem.domain;
 
-        // Incorporar semillas si existen
+        // Seed with existing explored individuals if provided
         for (let i = 0; i < Math.min(seedIndividuals.length, this.popSize); i++) {
             const ind = seedIndividuals[i];
             const evalResult = this.problem.evaluate(ind.x, ind.y);
             this.population.push(evalResult);
         }
 
-        // Completar con individuos aleatorios
+        // Fill remaining slots with uniform random samples
         while (this.population.length < this.popSize) {
             const rx = d.minX + Math.random() * (d.maxX - d.minX);
             const ry = d.minY + Math.random() * (d.maxY - d.minY);
@@ -80,7 +89,7 @@ class MiniGeneticAlgorithm {
     }
 
     /**
-     * Selección por torneo
+     * Tournament Selection
      */
     tournamentSelect() {
         let best = null;
@@ -95,11 +104,11 @@ class MiniGeneticAlgorithm {
     }
 
     /**
-     * Cruzamiento Aritmético Intermedio
+     * Arithmetic Intermediate Crossover
      */
     crossover(parent1, parent2) {
         if (Math.random() < this.crossoverRate) {
-            const alpha = 0.5; // o Math.random() * 1.2 - 0.1 para BLX-alpha
+            const alpha = 0.5;
             const c1x = alpha * parent1.x + (1 - alpha) * parent2.x;
             const c1y = alpha * parent1.y + (1 - alpha) * parent2.y;
             const c2x = (1 - alpha) * parent1.x + alpha * parent2.x;
@@ -116,16 +125,16 @@ class MiniGeneticAlgorithm {
     }
 
     /**
-     * Mutación Gaussiana
+     * Adaptive Gaussian Mutation scaled to domain dimensions
      */
     mutate(child) {
         const d = this.problem.domain;
         const spanX = (d.maxX - d.minX);
         const spanY = (d.maxY - d.minY);
-        const sigmaX = spanX * 0.05; // 5% del rango
+        const sigmaX = spanX * 0.05; // 5% of coordinate span
         const sigmaY = spanY * 0.05;
 
-        // Distribución Box-Muller para ruido Gaussiano
+        // Box-Muller transform for Gaussian noise
         const gaussianNoise = (stdDev) => {
             const u = 1 - Math.random();
             const v = Math.random();
@@ -143,7 +152,7 @@ class MiniGeneticAlgorithm {
             my += gaussianNoise(sigmaY);
         }
 
-        // Clamping a los límites
+        // Boundary clamping
         mx = Math.max(d.minX, Math.min(d.maxX, mx));
         my = Math.max(d.minY, Math.min(d.maxY, my));
 
@@ -151,19 +160,20 @@ class MiniGeneticAlgorithm {
     }
 
     /**
-     * Ejecuta una generación completa del ciclo evolutivo
-     * Retorna la nueva población evaluada
+     * Steps one generation of the evolutionary cycle
+     * Returns newly evaluated population
      */
     stepGeneration() {
         this.generation++;
         const nextPopulation = [];
 
-        // 1. Elitismo: Conservar los mejores individuos sin alteración
-        for (let i = 0; i < this.elitismCount && i < this.population.length; i++) {
+        // 1. Elitism: preserve top performers intact (if elitismCount > 0)
+        const eliteCount = Math.min(this.elitismCount, this.population.length);
+        for (let i = 0; i < eliteCount; i++) {
             nextPopulation.push(this.population[i]);
         }
 
-        // 2. Reproducción: Selección, Cruzamiento y Mutación
+        // 2. Reproduction: Selection, Crossover, and Mutation
         while (nextPopulation.length < this.popSize) {
             const p1 = this.tournamentSelect();
             const p2 = this.tournamentSelect();
@@ -188,7 +198,7 @@ class MiniGeneticAlgorithm {
     }
 
     /**
-     * Ejecuta múltiples generaciones
+     * Executes multiple generations in batch
      */
     runGenerations(numGens = 10) {
         const allNewEvaluations = [];
