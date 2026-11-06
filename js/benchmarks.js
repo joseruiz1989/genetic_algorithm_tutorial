@@ -189,9 +189,141 @@ class OptimizationProblem {
         // Wave frequency configuration (particularly relevant for Schaffer F6)
         this.frequency = options.frequency !== undefined ? options.frequency : 1.0;
 
+        // Decimal Precision / Resolution Configuration (0 = Integers only, 1, 2, 3, or null = Continuous)
+        this.decimals = options.decimals !== undefined ? options.decimals : null;
+
+        // Explored states tracking for combinatorial universe coverage analysis
+        this.uniqueExploredStates = new Map(); // key -> { source: 'ga'|'random'|'manual', x, y, fitness }
+        this.totalEvalsCount = 0;
+        this.gaEvalsCount = 0;
+        this.randomEvalsCount = 0;
+
         // Session seed ID
         this.seedId = "EXP-" + Math.floor(100000 + Math.random() * 900000);
         this.createdAt = new Date().toISOString();
+    }
+
+    /**
+     * Set decimal resolution / precision
+     * @param {number|null} dec 0 for integers, 1, 2, 3 or null for continuous float
+     */
+    setDecimals(dec) {
+        this.decimals = (dec !== null && dec !== undefined && dec !== "continuous") ? parseInt(dec) : null;
+        this.uniqueExploredStates.clear();
+        this.totalEvalsCount = 0;
+        this.gaEvalsCount = 0;
+        this.randomEvalsCount = 0;
+    }
+
+    /**
+     * Quantize a coordinate according to current decimal precision
+     */
+    quantize(val, minBound, maxBound) {
+        let clamped = Math.max(minBound, Math.min(maxBound, val));
+        if (this.decimals !== null && this.decimals !== undefined) {
+            const factor = Math.pow(10, this.decimals);
+            clamped = Math.round(clamped * factor) / factor;
+            // Ensure within boundaries after rounding
+            clamped = Math.max(minBound, Math.min(maxBound, clamped));
+        }
+        return clamped;
+    }
+
+    /**
+     * Calculate search space combinatorial universe
+     * Returns { isDiscrete, decimals, nx, ny, totalUniverse, totalUniverseFormatted }
+     */
+    getSearchSpaceInfo() {
+        const spanX = this.domain.maxX - this.domain.minX;
+        const spanY = this.domain.maxY - this.domain.minY;
+
+        if (this.decimals === null || this.decimals === undefined) {
+            return {
+                isDiscrete: false,
+                decimals: null,
+                label: "Continuous (64-bit IEEE 754 Float)",
+                nx: "∞ (continuous)",
+                ny: "∞ (continuous)",
+                totalUniverse: Infinity,
+                totalUniverseFormatted: "Infinite (Continuous Domain)"
+            };
+        }
+
+        const step = Math.pow(10, -this.decimals);
+        const nx = Math.round(spanX / step) + 1;
+        const ny = Math.round(spanY / step) + 1;
+        const totalUniverse = nx * ny;
+
+        let formatted = totalUniverse.toLocaleString();
+        if (totalUniverse > 1e9) {
+            formatted = totalUniverse.toExponential(2);
+        }
+
+        return {
+            isDiscrete: true,
+            decimals: this.decimals,
+            label: this.decimals === 0 ? "Integers Only (0 Decimals)" : `${this.decimals} Decimal Places (step ${step})`,
+            nx: nx,
+            ny: ny,
+            step: step,
+            totalUniverse: totalUniverse,
+            totalUniverseFormatted: `${formatted} states (${nx.toLocaleString()} × ${ny.toLocaleString()})`
+        };
+    }
+
+    /**
+     * Track an evaluation in the state universe
+     */
+    registerEvaluation(x, y, fitness, source = "ga") {
+        this.totalEvalsCount++;
+        if (source === "ga") this.gaEvalsCount++;
+        else if (source === "random") this.randomEvalsCount++;
+
+        const keyDec = this.decimals !== null ? this.decimals : 4;
+        const key = `${x.toFixed(keyDec)},${y.toFixed(keyDec)}`;
+
+        if (!this.uniqueExploredStates.has(key)) {
+            this.uniqueExploredStates.set(key, { source, x, y, fitness });
+        }
+    }
+
+    /**
+     * Returns stats on search space coverage
+     */
+    getCoverageStats() {
+        const info = this.getSearchSpaceInfo();
+        const uniqueCount = this.uniqueExploredStates.size;
+
+        let uniqueGA = 0;
+        let uniqueRandom = 0;
+        let uniqueManual = 0;
+
+        for (const [_, entry] of this.uniqueExploredStates) {
+            if (entry.source === "ga") uniqueGA++;
+            else if (entry.source === "random") uniqueRandom++;
+            else uniqueManual++;
+        }
+
+        let coveragePercent = 0;
+        if (info.isDiscrete && info.totalUniverse > 0 && info.totalUniverse !== Infinity) {
+            coveragePercent = (uniqueCount / info.totalUniverse) * 100;
+        }
+
+        return {
+            isDiscrete: info.isDiscrete,
+            decimals: this.decimals,
+            totalUniverse: info.totalUniverse,
+            totalUniverseFormatted: info.totalUniverseFormatted,
+            uniqueTotal: uniqueCount,
+            uniqueGA: uniqueGA,
+            uniqueRandom: uniqueRandom,
+            uniqueManual: uniqueManual,
+            totalEvals: this.totalEvalsCount,
+            coveragePercent: coveragePercent,
+            coverageFormatted: info.isDiscrete 
+                ? (coveragePercent < 0.0001 ? `${coveragePercent.toExponential(3)}%` : `${coveragePercent.toFixed(4)}%`)
+                : `${uniqueCount} distinct points sampled`
+        };
     }
 
     /**
@@ -205,16 +337,16 @@ class OptimizationProblem {
      * Evaluate a candidate solution (individual) at coordinates (x, y)
      * Returns { fitness, rawNormalized, percentOfGlobal, distanceToOptimum, inDomain }
      */
-    evaluate(x, y) {
+    evaluate(x, y, source = "ga") {
+        // Discretize coordinates according to precision setting
+        const clampedX = this.quantize(x, this.domain.minX, this.domain.maxX);
+        const clampedY = this.quantize(y, this.domain.minY, this.domain.maxY);
+
         // Domain validation
         const inDomain = (
-            x >= this.domain.minX && x <= this.domain.maxX &&
-            y >= this.domain.minY && y <= this.domain.maxY
+            clampedX >= this.domain.minX && clampedX <= this.domain.maxX &&
+            clampedY >= this.domain.minY && clampedY <= this.domain.maxY
         );
-
-        // Clamping to domain boundaries
-        const clampedX = Math.max(this.domain.minX, Math.min(this.domain.maxX, x));
-        const clampedY = Math.max(this.domain.minY, Math.min(this.domain.maxY, y));
 
         // Normalized fitness between [0, 1]
         const rawNorm = this.benchmark.evaluateRaw(clampedX, clampedY, this.x0, this.y0, this.frequency);
@@ -230,6 +362,9 @@ class OptimizationProblem {
         const dy = clampedY - this.y0;
         const distanceToOptimum = Math.sqrt(dx * dx + dy * dy);
 
+        // Register in explored state space
+        this.registerEvaluation(clampedX, clampedY, fitness, source);
+
         return {
             x: clampedX,
             y: clampedY,
@@ -237,19 +372,21 @@ class OptimizationProblem {
             rawNormalized: rawNorm,
             percentOfGlobal: percentOfGlobal,
             distanceToOptimum: distanceToOptimum,
-            inDomain: inDomain
+            inDomain: inDomain,
+            source: source
         };
     }
 
     /**
      * Generates a uniform random candidate solution within the search space
      */
-    generateRandomIndividual() {
-        const x = this.domain.minX + Math.random() * (this.domain.maxX - this.domain.minX);
-        const y = this.domain.minY + Math.random() * (this.domain.maxY - this.domain.minY);
+    generateRandomIndividual(source = "random") {
+        const rawX = this.domain.minX + Math.random() * (this.domain.maxX - this.domain.minX);
+        const rawY = this.domain.minY + Math.random() * (this.domain.maxY - this.domain.minY);
         return {
-            x: Math.round(x * 100) / 100,
-            y: Math.round(y * 100) / 100
+            x: this.quantize(rawX, this.domain.minX, this.domain.maxX),
+            y: this.quantize(rawY, this.domain.minY, this.domain.maxY),
+            source: source
         };
     }
 }

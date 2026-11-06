@@ -236,6 +236,31 @@ class Surface3DViewer {
             const obj = this.pointsGroup.children[0];
             this.pointsGroup.remove(obj);
         }
+        if (this.inspectedMesh && this.scene) {
+            this.scene.remove(this.inspectedMesh);
+            this.inspectedMesh = null;
+        }
+    }
+
+    setInspectedEvaluation(point) {
+        if (!this.scene) return;
+        if (this.inspectedMesh) {
+            this.scene.remove(this.inspectedMesh);
+            this.inspectedMesh = null;
+        }
+        if (!point) return;
+
+        const ratio = point.percentOfGlobal / 100;
+        const p3d = this.mathTo3D(point.x, point.y, ratio);
+
+        const ringGeom = new THREE.TorusGeometry(3.5, 0.4, 16, 32);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+        const ring = new THREE.Mesh(ringGeom, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(p3d.x, p3d.y + 1.2, p3d.z);
+
+        this.inspectedMesh = ring;
+        this.scene.add(ring);
     }
 
     animate() {

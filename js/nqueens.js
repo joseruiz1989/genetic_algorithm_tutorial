@@ -1526,5 +1526,12 @@ class NQueensUI {
     }
 }
 
-// Global reference for external access
-window.NQueensUI = NQueensUI;
+// Global and universal exports
+if (typeof window !== "undefined") {
+    window.NQueensUI = NQueensUI;
+    window.NQueensProblem = NQueensProblem;
+    window.NQueensGA = NQueensGA;
+}
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = { NQueensProblem, NQueensGA, NQueensUI };
+}

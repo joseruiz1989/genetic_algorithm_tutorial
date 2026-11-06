@@ -40,6 +40,7 @@ class LandscapeRenderer {
         // Evaluation history
         this.evaluations = [];
         this.bestEvaluation = null;
+        this.inspectedEvaluation = null; // Currently selected/clicked individual for pedagogical focus
 
         // Click ripple animations
         this.ripples = [];
@@ -114,6 +115,21 @@ class LandscapeRenderer {
             alpha: 1.0,
             fitnessRatio: point.percentOfGlobal / 100
         });
+    }
+
+    setInspectedEvaluation(evalObj) {
+        this.inspectedEvaluation = evalObj;
+        if (evalObj) {
+            // Trigger focus ripple
+            this.ripples.push({
+                x: evalObj.x,
+                y: evalObj.y,
+                radius: 2,
+                maxRadius: 40,
+                alpha: 1.0,
+                fitnessRatio: evalObj.percentOfGlobal / 100
+            });
+        }
     }
 
     addEvaluations(points) {
@@ -636,6 +652,52 @@ class LandscapeRenderer {
 
                 ctx.fillStyle = "#ffd700";
                 ctx.fillText(tagText, boxX, boxY);
+                ctx.restore();
+            }
+        }
+
+        // Highlight actively inspected / clicked solution
+        if (this.inspectedEvaluation) {
+            const insp = this.inspectedEvaluation;
+            if (insp.x >= v.minX && insp.x <= v.maxX && insp.y >= v.minY && insp.y <= v.maxY) {
+                const { px, py } = this.mathToScreen(insp.x, insp.y);
+
+                ctx.save();
+                const inspPulse = 14 + Math.cos(Date.now() / 150) * 5;
+                // Target reticle
+                ctx.strokeStyle = "#00e5ff";
+                ctx.lineWidth = 2.5;
+                ctx.shadowColor = "#00e5ff";
+                ctx.shadowBlur = 16;
+                ctx.beginPath();
+                ctx.arc(px, py, inspPulse, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Crosshair ticks
+                ctx.beginPath();
+                ctx.moveTo(px - inspPulse - 6, py); ctx.lineTo(px - inspPulse + 2, py);
+                ctx.moveTo(px + inspPulse - 2, py); ctx.lineTo(px + inspPulse + 6, py);
+                ctx.moveTo(px, py - inspPulse - 6); ctx.lineTo(px, py - inspPulse + 2);
+                ctx.moveTo(px, py + inspPulse - 2); ctx.lineTo(px, py + inspPulse + 6);
+                ctx.stroke();
+
+                // Floating label
+                ctx.fillStyle = "rgba(7, 14, 28, 0.92)";
+                ctx.strokeStyle = "#00e5ff";
+                ctx.lineWidth = 1.2;
+                const inspTag = `🔍 #${insp.id || 'ind'} (${insp.x.toFixed(2)}, ${insp.y.toFixed(2)}) | Fit: ${insp.fitness ? insp.fitness.toFixed(3) : '-'}`;
+                ctx.font = "bold 11px 'JetBrains Mono', monospace";
+                const w = ctx.measureText(inspTag).width;
+                const bx = Math.min(this.width - w - 16, Math.max(10, px - w / 2));
+                const by = Math.max(20, py + inspPulse + 18);
+
+                ctx.beginPath();
+                ctx.roundRect(bx - 6, by - 12, w + 12, 18, 4);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(inspTag, bx, by + 1);
                 ctx.restore();
             }
         }

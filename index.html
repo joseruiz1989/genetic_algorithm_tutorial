@@ -50,12 +50,23 @@
                 <span>👑 N-Queens</span>
                 <span class="tab-tag">4 / 8 / 16</span>
             </button>
+            <button class="module-tab-btn" id="tabModuleStepLab" onclick="if(window.switchAppModule) window.switchAppModule('step_lab')" title="Module 3: Step-by-Step GA Deep Dive (Roulette Wheel & Genetic Operators)">
+                <span>🔬 Step-by-Step Lab</span>
+                <span class="tab-tag">Roulette & Recombination</span>
+            </button>
+            <button class="module-tab-btn" id="tabModuleToyProblems" onclick="if(window.switchAppModule) window.switchAppModule('toy_problems')" title="Module 4: Classic & Discrete Toy Problems (Zero-Sum, Knapsack, Word Guesser)">
+                <span>🧩 Various Problems</span>
+                <span class="tab-tag">Zero-Sum 10 / Knapsack</span>
+            </button>
         </nav>
 
         <div class="header-actions">
+            <button class="btn btn-secondary btn-sm" id="btnToggleProjector" title="Toggle High-Contrast / Projector Presentation Mode">
+                🖥️ Projector Mode
+            </button>
             <span class="badge-tag" id="sessionBadge">ID: EXP-000000</span>
             <button class="btn btn-secondary btn-sm" id="btnOpenTheoryModal">
-                📖 Theory & Research Guide
+                📖 Theory & Guide
             </button>
         </div>
     </header>
@@ -115,6 +126,26 @@
                     <small style="display: block; font-size: 0.68rem; color: var(--text-dim); margin-top: 4px;">
                         Expanding the domain makes uniform random/grid search exponentially harder, illustrating why GAs
                         are vital.
+                    </small>
+                </div>
+
+                <!-- Problem Precision / Resolution Selector -->
+                <div class="form-group" id="groupPrecision">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label class="form-label" for="selectPrecision" style="margin-bottom: 0;">Resolution / Precision:</label>
+                        <span class="badge-tag" id="badgePrecision" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-gold); border-color: rgba(255, 208, 0, 0.3);">
+                            0 Dec (Integers)
+                        </span>
+                    </div>
+                    <select class="form-select" id="selectPrecision">
+                        <option value="0" selected>0 Decimals (Integers only, e.g. -100, -99... 100)</option>
+                        <option value="1">1 Decimal Place (Step 0.1, e.g. -100.0, -99.9...)</option>
+                        <option value="2">2 Decimal Places (Step 0.01)</option>
+                        <option value="3">3 Decimal Places (Step 0.001)</option>
+                        <option value="continuous">Continuous (64-bit Floating Point)</option>
+                    </select>
+                    <small style="display: block; font-size: 0.68rem; color: var(--text-dim); margin-top: 4px;">
+                        Discretizes search space into a finite grid to calculate exact combinatorial universe size.
                     </small>
                 </div>
 
@@ -267,6 +298,69 @@
                         </small>
                     </div>
 
+                    <!-- Crossover Rate ($P_c$) -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                            <label class="form-label" for="sliderGaCrossover" style="margin-bottom: 0; font-size: 0.74rem;">
+                                Crossover Rate ($P_c$):
+                            </label>
+                            <span class="badge-tag" id="valGaCrossover" style="font-family: var(--font-mono); font-size: 0.72rem; color: #00e5ff;">85%</span>
+                        </div>
+                        <input type="range" id="sliderGaCrossover" min="0.10" max="1.00" step="0.05" value="0.85" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                    </div>
+
+                    <!-- Crossover Operator -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="selectGaCrossoverType" style="margin-bottom: 2px; font-size: 0.74rem;">
+                            Crossover Operator:
+                        </label>
+                        <select class="form-select" id="selectGaCrossoverType" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <option value="blend" selected>Arithmetic Blending (BLX / α-blend)</option>
+                            <option value="sbx">Simulated Binary Crossover (SBX)</option>
+                            <option value="single_point">Single-Point Coordinate Swap</option>
+                            <option value="uniform">Uniform Coordinate Recombination</option>
+                        </select>
+                    </div>
+
+                    <!-- Mutation Rate ($P_m$) -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                            <label class="form-label" for="sliderGaMutation" style="margin-bottom: 0; font-size: 0.74rem;">
+                                Mutation Rate ($P_m$):
+                            </label>
+                            <span class="badge-tag" id="valGaMutation" style="font-family: var(--font-mono); font-size: 0.72rem; color: #ff55aa;">20%</span>
+                        </div>
+                        <input type="range" id="sliderGaMutation" min="0.01" max="0.70" step="0.01" value="0.20" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                    </div>
+
+                    <!-- Mutation Step Size (Sigma) -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                            <label class="form-label" for="sliderGaSigma" style="margin-bottom: 0; font-size: 0.74rem;">
+                                Mutation Perturbation ($\sigma$):
+                            </label>
+                            <span class="badge-tag" id="valGaSigma" style="font-family: var(--font-mono); font-size: 0.72rem;">5% domain</span>
+                        </div>
+                        <input type="range" id="sliderGaSigma" min="0.01" max="0.25" step="0.01" value="0.05" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                    </div>
+
+                    <!-- Selection Method -->
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="selectGaSelection" style="margin-bottom: 2px; font-size: 0.74rem;">
+                            Parent Selection Method:
+                        </label>
+                        <select class="form-select" id="selectGaSelection" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <option value="tournament" selected>Tournament Selection (k=3)</option>
+                            <option value="roulette">Roulette Wheel (Fitness Proportionate)</option>
+                            <option value="rank">Linear Rank Selection</option>
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Tuning Banner -->
+                    <div style="background: rgba(0, 229, 255, 0.08); border: 1px dashed rgba(0, 229, 255, 0.35); border-radius: 4px; padding: 6px 8px; font-size: 0.68rem; color: #38bdf8;">
+                        ⚡ <strong>Dynamic Adaptation:</strong> You can modify Crossover & Mutation rates between generations to adapt exploration vs. exploitation!
+                    </div>
+
                 </div>
 
                 <!-- GA Action Buttons -->
@@ -386,6 +480,37 @@
                 </div>
             </div>
 
+            <!-- Search Space Combinations & Coverage Card -->
+            <div class="card-section search-universe-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div class="card-title" style="color: var(--primary-cyan); margin-bottom: 0; font-size: 0.8rem;">
+                        🌌 Search Space Universe
+                    </div>
+                    <span class="badge-tag" id="badgeUniverseCoverage" style="font-family: var(--font-mono); font-size: 0.7rem; color: #00f090; border-color: rgba(0, 240, 144, 0.3);">
+                        0.000% Explored
+                    </span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">Total Combinations:</span>
+                    <span class="stat-value" id="statUniverseSize" style="font-size: 0.82rem; color: #ffffff; font-weight: bold;">40,401 states (201×201)</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">Unique Explored Points:</span>
+                    <span class="stat-value" id="statUniqueExplored" style="color: var(--primary-cyan); font-weight: bold;">0</span>
+                </div>
+
+                <div class="stat-row">
+                    <span class="stat-label">Samples by Source:</span>
+                    <span class="stat-value" id="statExploredBreakdown" style="font-size: 0.7rem; color: var(--text-dim);">GA: 0 | Random: 0 | Manual: 0</span>
+                </div>
+
+                <small style="display: block; font-size: 0.67rem; color: var(--text-dim); margin-top: 4px; line-height: 1.35;" id="textCoveragePedagogical">
+                    💡 Demonstrates how GAs locate optimal basins by evaluating only a tiny fraction of the search universe.
+                </small>
+            </div>
+
             <!-- Real-Time Statistics Card -->
             <div class="card-section">
                 <div class="card-title">📊 Search Statistics</div>
@@ -419,14 +544,19 @@
 
             <!-- Convergence Chart Card -->
             <div class="card-section">
-                <div class="card-title">📈 Convergence Curve</div>
-                <div class="chart-container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div class="card-title" style="margin-bottom: 0;">📈 Convergence Curve</div>
+                    <label class="toggle-item" style="font-size: 0.68rem;" title="Show all individual evaluation points as a scatter cloud">
+                        <input type="checkbox" id="toggleScatterPop" class="switch-input" checked>
+                        <span>Scatter Cloud</span>
+                    </label>
+                </div>
+                <div class="chart-container" style="position: relative; cursor: crosshair;">
                     <canvas id="convergenceChart"></canvas>
                 </div>
-                <div
-                    style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-dim); margin-top: 4px; font-family: var(--font-mono);">
+                <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-dim); margin-top: 4px; font-family: var(--font-mono);">
                     <span>Eval #1</span>
-                    <span>Fitness Progress</span>
+                    <span id="chartInspectedNotice" style="color: var(--primary-cyan); font-weight: bold;">Click any point to inspect candidate</span>
                     <span id="chartMaxEval">#0</span>
                 </div>
             </div>
@@ -874,6 +1004,424 @@
 
     </main>
 
+    <!-- Module 3: Step-by-Step GA Pedagogical Laboratory -->
+    <main class="step-lab-layout" id="moduleStepLab" style="display: none;">
+
+        <!-- Left Column: Lab Configuration & GA Parameters -->
+        <aside class="sidebar-panel">
+            <div class="card-section">
+                <div class="card-title">🔬 Step-by-Step Lab Setup</div>
+
+                <div class="form-group">
+                    <label class="form-label" for="selectStepProblem">Demonstration Problem:</label>
+                    <select class="form-select" id="selectStepProblem">
+                        <option value="f6" selected>Schaffer F6 Continuous Function</option>
+                        <option value="nqueens">N-Queens (8-Queens Permutation)</option>
+                        <option value="zerosum10">Zero-Sum 10 Numbers (Target = 0)</option>
+                        <option value="sum2">Sum of 2 Numbers (X + Y = 0)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label class="form-label" for="sliderStepPop" style="margin-bottom: 0;">Population Size (N):</label>
+                        <span class="badge-tag" id="valStepPop" style="font-family: var(--font-mono); font-size: 0.72rem;">8</span>
+                    </div>
+                    <input type="range" id="sliderStepPop" min="4" max="50" step="2" value="8" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                    <div style="display: flex; gap: 4px; margin-top: 4px;">
+                        <button type="button" class="btn btn-secondary btn-sm step-pop-preset" data-pop="8" style="flex: 1; padding: 2px 0; font-size: 0.65rem;">N=8</button>
+                        <button type="button" class="btn btn-secondary btn-sm step-pop-preset" data-pop="16" style="flex: 1; padding: 2px 0; font-size: 0.65rem;">N=16</button>
+                        <button type="button" class="btn btn-secondary btn-sm step-pop-preset" data-pop="24" style="flex: 1; padding: 2px 0; font-size: 0.65rem;">N=24</button>
+                        <button type="button" class="btn btn-secondary btn-sm step-pop-preset" data-pop="40" style="flex: 1; padding: 2px 0; font-size: 0.65rem;">N=40</button>
+                    </div>
+                    <small style="display: block; font-size: 0.67rem; color: var(--text-dim); margin-top: 3px;">
+                        Scalable from 4 to 50 individuals. Use small sizes for detailed wheel projection, larger for genetic diversity.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label class="form-label" for="sliderStepCross" style="margin-bottom: 0;">Crossover Rate (Pc):</label>
+                        <span class="badge-tag" id="valStepCross" style="font-family: var(--font-mono); font-size: 0.72rem; color: #00e5ff;">85%</span>
+                    </div>
+                    <input type="range" id="sliderStepCross" min="0.10" max="1.0" step="0.05" value="0.85" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label class="form-label" for="sliderStepMut" style="margin-bottom: 0;">Mutation Rate (Pm):</label>
+                        <span class="badge-tag" id="valStepMut" style="font-family: var(--font-mono); font-size: 0.72rem; color: #ff55aa;">25%</span>
+                    </div>
+                    <input type="range" id="sliderStepMut" min="0.05" max="0.80" step="0.05" value="0.25" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="margin-bottom: 2px;">Stepper Speed:</label>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                        <button type="button" class="step-speed-btn" data-speed="slow">Slow (1.4s)</button>
+                        <button type="button" class="step-speed-btn active" data-speed="medium">Med (0.8s)</button>
+                        <button type="button" class="step-speed-btn" data-speed="fast">Fast (0.3s)</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary btn-sm" id="btnStepReset" style="width: 100%; margin-top: 4px;">
+                    ⟲ Reset to Generation 0
+                </button>
+            </div>
+
+            <!-- Evolutionary Flow Guide -->
+            <div class="card-section">
+                <div class="card-title">📖 Evolutionary Stages</div>
+                <div style="font-size: 0.73rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px;">
+                    <div>1. <strong>Population Init:</strong> Random genomes created & evaluated.</div>
+                    <div>2. <strong>Roulette Wheel:</strong> Slices sized proportional to fitness.</div>
+                    <div>3. <strong>Selection:</strong> Spin wheel to pick Parent 1 and Parent 2.</div>
+                    <div>4. <strong>Crossover:</strong> Recombine parent genes to create offspring.</div>
+                    <div>5. <strong>Mutation:</strong> Random perturbation to prevent stagnation.</div>
+                    <div>6. <strong>Offspring Insertion:</strong> Fill Generation t+1 pool.</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Column: Animated Roulette Wheel & Stepper Controls -->
+        <section class="center-viewport">
+            <div class="viewport-toolbar">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="badge-tag" id="stepBadgeGen" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--primary-cyan); border-color: rgba(0, 229, 255, 0.4);">
+                        Gen 0
+                    </span>
+                    <span class="badge-tag" id="stepBadgeStage" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-gold); border-color: rgba(255, 208, 0, 0.4);">
+                        1. Population Init
+                    </span>
+                </div>
+                <div class="step-stepper-cluster">
+                    <button class="btn btn-primary btn-sm" id="btnStepNext" style="font-weight: bold;">
+                        ▶ Next Step
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btnStepSpin" title="Spin Roulette Wheel to select parent">
+                        🎲 Spin Roulette
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btnStepFinishPair" title="Quickly complete selection, crossover & mutation for this pair">
+                        ⏩ Finish Pair
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btnStepFinishGen" title="Complete entire generation">
+                        ⚡ Finish Gen
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="btnStepAutoPlay">
+                        ▶ Auto Step
+                    </button>
+                </div>
+            </div>
+
+            <!-- Explainer Banner -->
+            <div class="step-banner-explainer" id="stepExplainerText">
+                <strong>Generation 0 Initialized:</strong> Evaluate each individual and observe how the Roulette Wheel allocates probabilities proportional to fitness.
+            </div>
+
+            <!-- 2-Column Split: Roulette Wheel (Left) & Complete Population List (Right) -->
+            <div class="step-roulette-pop-split">
+                <!-- Left Sub-column: Roulette Wheel Visualizer -->
+                <div class="step-roulette-col">
+                    <div class="step-roulette-card">
+                        <div class="step-roulette-header">
+                            <span class="card-title" style="margin-bottom: 0; font-size: 0.8rem;">🎯 Roulette Wheel Selector</span>
+                            <span class="badge-tag" id="stepRouletteStatus" style="font-size: 0.68rem; color: var(--accent-gold);">Ready</span>
+                        </div>
+                        <div class="step-roulette-canvas-wrap">
+                            <canvas id="stepRouletteCanvas" width="320" height="320"></canvas>
+                        </div>
+                        <div class="step-roulette-caption">
+                            <strong>Top Needle:</strong> Selected parent. Slice: $p_i = \frac{f_i}{\sum f_k}$.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Sub-column: Complete Population & Slices Breakdown -->
+                <div class="step-pop-col">
+                    <div class="step-pop-card">
+                        <div class="step-pop-header">
+                            <div>
+                                <span class="card-title" style="margin-bottom: 0; font-size: 0.82rem;">👥 Complete Population & Slice Mapping</span>
+                                <div style="font-size: 0.68rem; color: var(--text-dim); margin-top: 2px;">
+                                    Hover row to illuminate wheel slice. Probability determines slice width.
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <span class="badge-tag" id="stepBadgePopCount" style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--primary-cyan);">
+                                    8 Individuals
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="step-pop-table-wrap">
+                            <table class="history-table step-detailed-pop-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 44px; text-align: center;">Slice</th>
+                                        <th style="width: 50px;">ID</th>
+                                        <th>Phenotype / Genes</th>
+                                        <th style="text-align: right; width: 75px;">Fitness ($f_i$)</th>
+                                        <th style="text-align: right; width: 70px;">Prob ($p_i$)</th>
+                                        <th style="text-align: right; width: 100px;">Interval $[A, B)$</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stepPopTableBody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Pair Reproduction Inspector -->
+            <div class="card-section" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div class="card-title" style="margin-bottom: 0; font-size: 0.8rem; color: #ff0077;">
+                        🧬 Current Pair Reproduction (Selection → Crossover → Mutation)
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="btnStepForceMutate" style="font-size: 0.68rem; padding: 2px 6px; border-color: rgba(255, 0, 119, 0.4); color: #ff55aa;">
+                        ⚡ Force Mutate Gene
+                    </button>
+                </div>
+                <div id="stepPairInspection">
+                    <!-- Populated dynamically by StepLab -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Generation Diagnostics, Offspring Pool & History -->
+        <aside class="sidebar-panel">
+            <!-- Card 1: Fitness & Selection Pressure Diagnostics -->
+            <div class="card-section">
+                <div class="card-title">📊 Generation Diagnostics</div>
+                <div class="step-stats-grid">
+                    <div class="stat-mini-card">
+                        <span class="stat-mini-label">Best Fitness:</span>
+                        <span class="stat-mini-value" id="stepStatBestFit" style="color: var(--accent-gold); font-size: 0.95rem;">-</span>
+                    </div>
+                    <div class="stat-mini-card">
+                        <span class="stat-mini-label">Mean Fitness:</span>
+                        <span class="stat-mini-value" id="stepStatAvgFit" style="color: var(--primary-cyan); font-size: 0.95rem;">-</span>
+                    </div>
+                    <div class="stat-mini-card">
+                        <span class="stat-mini-label">Total $\sum f_i$:</span>
+                        <span class="stat-mini-value" id="stepStatTotalFit" style="font-size: 0.85rem;">-</span>
+                    </div>
+                    <div class="stat-mini-card">
+                        <span class="stat-mini-label">Selection Pressure:</span>
+                        <span class="stat-mini-value" id="stepStatPressure" style="color: #ff55aa; font-size: 0.85rem;" title="Ratio of max fitness to mean fitness (f_max / f_avg)">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Next Generation Pool G_{t+1} -->
+            <div class="card-section" style="flex: 1; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div class="card-title" style="margin-bottom: 0; color: var(--accent-emerald);">
+                        🌱 Next Gen Pool ($G_{t+1}$)
+                    </div>
+                    <span class="badge-tag" id="stepBadgePoolCount" style="font-size: 0.68rem; font-family: var(--font-mono); color: var(--accent-emerald);">
+                        0 / 8 Slots
+                    </span>
+                </div>
+                <div class="step-pool-progress-bar-wrap" style="margin-bottom: 8px;">
+                    <div class="step-pool-progress-bar" id="stepPoolProgressBar" style="width: 0%;"></div>
+                </div>
+                <div id="stepNextGenCards" style="flex: 1; overflow-y: auto; max-height: 230px;">
+                    <!-- Offspring queue -->
+                </div>
+            </div>
+
+            <!-- Card 3: Evolutionary History / Progress -->
+            <div class="card-section">
+                <div class="card-title">📜 Generational History</div>
+                <div class="table-scroll" style="max-height: 140px;">
+                    <table class="history-table" style="font-size: 0.72rem;">
+                        <thead>
+                            <tr>
+                                <th>Gen</th>
+                                <th style="text-align: right;">Best $f$</th>
+                                <th style="text-align: right;">Avg $f$</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stepHistoryTableBody">
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: var(--text-dim); padding: 8px;">
+                                    Generation 0 running...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- Module 4: Classic & Discrete Toy Problems -->
+    <main class="toy-problems-layout" id="moduleToyProblems" style="display: none;">
+
+        <!-- Left Column: Problem Selection & GA Settings -->
+        <aside class="sidebar-panel">
+            <div class="card-section">
+                <div class="card-title">🧩 Select Challenge</div>
+
+                <div class="form-group">
+                    <label class="form-label" for="selectToyProblem">Toy Problem:</label>
+                    <select class="form-select" id="selectToyProblem">
+                        <option value="zerosum10" selected>Zero-Sum of 10 Numbers (Sum = 0)</option>
+                        <option value="sum2">Sum of 2 Numbers (X + Y = Target)</option>
+                        <option value="word_guesser">Target Phrase Guesser ("GENETIC ALGORITHM")</option>
+                        <option value="knapsack">0/1 Knapsack (Value vs Weight Limit)</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="groupToyTargetSum">
+                    <label class="form-label" for="inputToyTargetSum">Desired Target Sum:</label>
+                    <input type="number" id="inputToyTargetSum" class="form-input" value="0" style="font-family: var(--font-mono);">
+                    <small style="display: block; font-size: 0.68rem; color: var(--text-dim); margin-top: 4px;">
+                        The GA searches the domain [-100, 100] to find integers whose sum exactly equals this target.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label class="form-label" for="sliderToyPop" style="margin-bottom: 0;">Population Size (N):</label>
+                        <span class="badge-tag" id="valToyPop" style="font-family: var(--font-mono); font-size: 0.72rem;">60</span>
+                    </div>
+                    <input type="range" id="sliderToyPop" min="20" max="200" step="10" value="60" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label class="form-label" for="sliderToyCross" style="margin-bottom: 0;">Crossover Rate (Pc):</label>
+                        <span class="badge-tag" id="valToyCross" style="font-family: var(--font-mono); font-size: 0.72rem; color: #00e5ff;">85%</span>
+                    </div>
+                    <input type="range" id="sliderToyCross" min="0.40" max="1.0" step="0.05" value="0.85" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label class="form-label" for="sliderToyMut" style="margin-bottom: 0;">Mutation Rate (Pm):</label>
+                        <span class="badge-tag" id="valToyMut" style="font-family: var(--font-mono); font-size: 0.72rem; color: #ff55aa;">15%</span>
+                    </div>
+                    <input type="range" id="sliderToyMut" min="0.01" max="0.50" step="0.01" value="0.15" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                </div>
+
+                <div class="form-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <label class="form-label" for="sliderToyElitism" style="margin-bottom: 0;">Elitism Count (E):</label>
+                        <span class="badge-tag" id="valToyElitism" style="font-family: var(--font-mono); font-size: 0.72rem;">2</span>
+                    </div>
+                    <input type="range" id="sliderToyElitism" min="0" max="8" step="1" value="2" class="form-input" style="padding: 2px 0; cursor: pointer;">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" style="margin-bottom: 2px;">Simulation Speed:</label>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                        <button type="button" class="toy-speed-btn" data-speed="slow">Slow</button>
+                        <button type="button" class="toy-speed-btn active" data-speed="medium">Med</button>
+                        <button type="button" class="toy-speed-btn" data-speed="fast">Turbo</button>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+                    <button class="btn btn-ga-evolve" id="btnToyPlay" style="width: 100%;">
+                        ▶ Start GA
+                    </button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                        <button class="btn btn-secondary btn-sm" id="btnToyStep">
+                            ▶ 1 Gen
+                        </button>
+                        <button class="btn btn-secondary btn-sm" id="btnToySolve" style="color: var(--accent-gold); border-color: rgba(255, 208, 0, 0.4);">
+                            ⚡ Solve Fast
+                        </button>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="btnToyReset" style="width: 100%;">
+                        ⟲ Reset Population
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Column: Big Chromosome Visualizer & Convergence Curve -->
+        <section class="center-viewport">
+            <!-- Viewport Toolbar -->
+            <div class="viewport-toolbar">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="badge-tag" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--primary-cyan); border-color: rgba(0, 229, 255, 0.4);">
+                        Gen: <strong id="statToyGen">0</strong>
+                    </span>
+                    <span class="badge-tag" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--accent-gold); border-color: rgba(255, 208, 0, 0.4);">
+                        Evals: <strong id="statToyEvals">0</strong>
+                    </span>
+                    <span class="badge-tag" id="badgeToyUniverse" style="font-family: var(--font-mono); font-size: 0.72rem; color: #a855f7; border-color: rgba(168, 85, 247, 0.4);">
+                        Universe: 10^23
+                    </span>
+                </div>
+            </div>
+
+            <!-- Problem Pedagogical Explainer Banner -->
+            <div class="step-banner-explainer" id="toyProblemExplainer">
+                Ten integer variables each bounded between -100 and +100.
+            </div>
+
+            <!-- Big High-Contrast Chromosome Visualizer Card -->
+            <div class="toy-center-display">
+                <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: bold;">
+                    🏆 Best Individual Solution Chromosome
+                </div>
+                <div id="toyBestGenesContainer" style="width: 100%;">
+                    <!-- Dynamically generated big gene boxes -->
+                </div>
+            </div>
+
+            <!-- Convergence Curve Card -->
+            <div class="card-section" style="margin-top: 10px;">
+                <div class="card-title" style="margin-bottom: 6px;">📈 GA Convergence Curve</div>
+                <div class="chart-container" style="height: 120px;">
+                    <canvas id="toyConvergenceChart" style="width: 100%; height: 100%; display: block;"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Population Table & Diagnostics -->
+        <aside class="sidebar-panel">
+            <div class="card-section">
+                <div class="card-title">📊 Solution Quality</div>
+                <div class="stat-row">
+                    <span class="stat-label">Best Fitness:</span>
+                    <span class="stat-value" id="statToyBestFit" style="color: var(--accent-gold); font-size: 1.1rem; font-weight: bold;">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Status Details:</span>
+                    <span class="stat-value" id="statToyBestDetail" style="font-size: 0.72rem; color: var(--primary-cyan);">-</span>
+                </div>
+            </div>
+
+            <div class="card-section" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="card-title">👥 Top Population Candidates</div>
+                <div class="table-scroll" style="flex: 1;">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Candidate Genome</th>
+                                <th>Fitness</th>
+                            </tr>
+                        </thead>
+                        <tbody id="toyPopTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
     <!-- Theoretical and Pedagogical Modal Dialog -->
     <div class="modal-overlay" id="theoryModal">
         <div class="modal-card">
@@ -960,12 +1508,14 @@
     </div>
 
     <!-- Application Script Bundles with Versioning -->
-    <script src="js/benchmarks.js?v=2.5"></script>
-    <script src="js/ga_engine.js?v=2.5"></script>
-    <script src="js/landscape_renderer.js?v=2.5"></script>
-    <script src="js/surface_3d.js?v=2.5"></script>
-    <script src="js/nqueens.js?v=2.5"></script>
-    <script src="js/app.js?v=2.5"></script>
+    <script src="js/benchmarks.js?v=2.6"></script>
+    <script src="js/ga_engine.js?v=2.6"></script>
+    <script src="js/landscape_renderer.js?v=2.6"></script>
+    <script src="js/surface_3d.js?v=2.6"></script>
+    <script src="js/nqueens.js?v=2.6"></script>
+    <script src="js/step_lab.js?v=2.6"></script>
+    <script src="js/toy_problems.js?v=2.6"></script>
+    <script src="js/app.js?v=2.6"></script>
 </body>
 
 </html>

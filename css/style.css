@@ -166,16 +166,17 @@ body {
 /* 3-Column Main Layout */
 .main-layout {
     display: grid;
-    grid-template-columns: 310px 1fr 330px;
+    grid-template-columns: 320px 1fr 340px;
     gap: 16px;
     padding: 16px 20px;
-    height: calc(100vh - 67px);
+    height: calc(100vh - 72px);
+    min-height: 0;
     overflow: hidden;
 }
 
 @media (max-width: 1200px) {
     .main-layout {
-        grid-template-columns: 280px 1fr 300px;
+        grid-template-columns: 300px 1fr 310px;
     }
 }
 
@@ -183,22 +184,52 @@ body {
     .main-layout {
         grid-template-columns: 1fr;
         height: auto;
+        min-height: 0;
         overflow: visible;
     }
 }
 
-/* Scrolling Sidebar Panels */
+/* Universal and Custom Scrollbars for High-Contrast & Projector Visibility */
+::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(8, 14, 28, 0.95);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #00e5ff, #0284c7);
+    border-radius: 4px;
+    border: 1px solid rgba(0, 229, 255, 0.5);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #38bdf8;
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #00e5ff rgba(8, 14, 28, 0.95);
+}
+
+/* Scrolling Sidebar Panels (Strictly bounds contained with visible scrollbar) */
 .sidebar-panel {
     background: var(--bg-glass);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     padding: 16px;
+    min-height: 0;
+    max-height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
     gap: 16px;
     box-shadow: var(--shadow-card);
     backdrop-filter: blur(16px);
+    padding-bottom: 36px;
 }
 
 /* Cards inside panels */
@@ -1347,5 +1378,412 @@ body {
     font-size: 0.68rem;
     color: var(--primary-cyan);
 }
+
+/* ==========================================================================
+   PROJECTOR / HIGH-CONTRAST MODE (Lecture Hall & Meeting Optimization)
+   Increases base luminance, numbers font sizes, and enhances color saturation
+   ========================================================================== */
+
+body.projector-mode {
+    --bg-base: #020617;
+    --bg-surface: #0f172a;
+    --bg-surface-elevated: #1e293b;
+    --bg-glass: rgba(15, 23, 42, 0.94);
+    --border-glass: rgba(0, 229, 255, 0.35);
+    --border-subtle: rgba(255, 255, 255, 0.18);
+    --text-main: #ffffff;
+    --text-muted: #cbd5e1;
+    --text-dim: #94a3b8;
+    background-color: #020617;
+    font-size: 15px;
+}
+
+body.projector-mode .brand-title {
+    font-size: 1.45rem;
+    font-weight: 800;
+}
+
+body.projector-mode .card-title {
+    font-size: 0.95rem;
+    color: #38bdf8;
+    font-weight: 800;
+}
+
+body.projector-mode .stat-value {
+    font-size: 1.12rem !important;
+    font-weight: 800 !important;
+}
+
+body.projector-mode .progress-percent-val {
+    font-size: 1.5rem !important;
+    font-weight: 900 !important;
+}
+
+body.projector-mode .btn {
+    font-size: 0.92rem;
+    padding: 9px 18px;
+    font-weight: 700;
+}
+
+body.projector-mode .history-table td,
+body.projector-mode .history-table th {
+    font-size: 0.85rem;
+    padding: 8px 10px;
+}
+
+body.projector-mode .form-label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+body.projector-mode .badge-tag {
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+}
+
+/* ==========================================================================
+   STEP-BY-STEP LAB STYLES (Roulette Wheel & Genetic Operators)
+   ========================================================================== */
+
+.step-lab-layout {
+    display: grid;
+    grid-template-columns: 290px 1fr 290px;
+    gap: 16px;
+    padding: 16px 20px;
+    height: calc(100vh - 72px);
+    min-height: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 1200px) {
+    .step-lab-layout {
+        grid-template-columns: 270px 1fr 270px;
+    }
+}
+
+@media (max-width: 980px) {
+    .step-lab-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+}
+
+/* 2-Column Split: Roulette Wheel (Left) & Full Individuals List (Right) */
+.step-roulette-pop-split {
+    display: grid;
+    grid-template-columns: 330px 1fr;
+    gap: 14px;
+    align-items: stretch;
+    margin-top: 10px;
+}
+
+@media (max-width: 1100px) {
+    .step-roulette-pop-split {
+        grid-template-columns: 310px 1fr;
+    }
+}
+
+@media (max-width: 860px) {
+    .step-roulette-pop-split {
+        grid-template-columns: 1fr;
+    }
+}
+
+.step-roulette-col, .step-pop-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.step-roulette-card, .step-pop-card {
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.step-roulette-header, .step-pop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 6px;
+}
+
+.step-roulette-canvas-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 4px 0;
+    flex: 1;
+}
+
+#stepRouletteCanvas {
+    width: 300px;
+    height: 300px;
+    max-width: 100%;
+    display: block;
+    margin: 0 auto;
+    border-radius: 50%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.step-roulette-caption {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.step-pop-table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 310px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface-elevated);
+}
+
+.step-detailed-pop-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.step-detailed-pop-table th {
+    background: #0b1329;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 10px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.step-detailed-pop-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    vertical-align: middle;
+}
+
+.step-detailed-pop-table tr {
+    transition: background 0.15s ease, border-left 0.15s ease;
+    cursor: pointer;
+}
+
+.step-detailed-pop-table tr:hover {
+    background: rgba(56, 189, 248, 0.15) !important;
+}
+
+.step-detailed-pop-table tr.slice-highlight {
+    background: rgba(255, 208, 0, 0.22) !important;
+    outline: 1px solid rgba(255, 208, 0, 0.6);
+}
+
+.step-detailed-pop-table tr.parent1-active {
+    background: rgba(0, 229, 255, 0.2) !important;
+    border-left: 4px solid #00e5ff !important;
+}
+
+.step-detailed-pop-table tr.parent2-active {
+    background: rgba(255, 0, 119, 0.2) !important;
+    border-left: 4px solid #ff0077 !important;
+}
+
+.step-slice-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    vertical-align: middle;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    transition: transform 0.2s;
+}
+
+.step-detailed-pop-table tr:hover .step-slice-swatch {
+    transform: scale(1.25);
+}
+
+/* Generation Diagnostics mini-cards */
+.step-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.stat-mini-card {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-mini-label {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.stat-mini-value {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+/* Next Gen Pool Progress Bar */
+.step-pool-progress-bar-wrap {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.step-pool-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-cyan), var(--accent-emerald));
+    transition: width 0.3s ease;
+}
+
+.step-stepper-cluster {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: rgba(15, 23, 42, 0.8);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-glass);
+}
+
+.step-banner-explainer {
+    background: linear-gradient(90deg, rgba(0, 229, 255, 0.08) 0%, rgba(157, 78, 221, 0.08) 100%);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: var(--text-main);
+}
+
+.step-speed-btn, .toy-speed-btn, .nq-speed-btn {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.step-speed-btn.active, .toy-speed-btn.active, .nq-speed-btn.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+/* Projector Mode Overrides for Step-by-Step Lab */
+body.projector-mode .step-detailed-pop-table {
+    font-size: 0.92rem;
+    font-weight: 600;
+}
+
+body.projector-mode .step-detailed-pop-table td {
+    padding: 8px 10px;
+    color: #ffffff;
+}
+
+body.projector-mode .step-slice-swatch {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+}
+
+body.projector-mode .stat-mini-card {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: #1e293b;
+}
+
+body.projector-mode .stat-mini-value {
+    font-size: 1.05rem !important;
+}
+
+body.projector-mode .stat-mini-label {
+    color: #cbd5e1;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   TOY PROBLEMS / VARIOUS COMBINATORIAL CHALLENGES STYLES
+   ========================================================================== */
+
+.toy-problems-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr 340px;
+    gap: 16px;
+    padding: 16px 20px;
+    height: calc(100vh - 72px);
+    min-height: 0;
+    overflow: hidden;
+}
+
+@media (max-width: 1200px) {
+    .toy-problems-layout {
+        grid-template-columns: 300px 1fr 300px;
+    }
+}
+
+@media (max-width: 980px) {
+    .toy-problems-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+}
+
+.toy-center-display {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Search Space Universe Analysis Card */
+.search-universe-card {
+    background: linear-gradient(180deg, rgba(0, 229, 255, 0.06) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    border-radius: var(--radius-md);
+    padding: 12px;
+}
+
 
 
